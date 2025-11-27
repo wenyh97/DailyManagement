@@ -53,7 +53,7 @@ jobs:
           echo "frontend 目录文件列表："
           ls -al frontend || true
 
-      - name: Upload files to server via scp  # 自动上传配置和静态文件
+      - name: Upload files to server via scp  # 自动上传配置和静态文件（优化，只上传必要前端资源）
         uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ env.SERVER_HOST }}
@@ -62,7 +62,10 @@ jobs:
           source: |
             docker-compose.yml
             nginx.conf
-            frontend/*
+            frontend/*.html
+            frontend/css/
+            frontend/js/
+            frontend/libs/
           target: ${{ env.SERVER_BASE_PATH }}/deploy-temp
 
       - name: Deploy and restart services on server  # 远程部署和重启服务
