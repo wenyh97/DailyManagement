@@ -1,0 +1,161 @@
+<div id="event-manager">
+    <div id="event-modal" class="modal hidden">
+        <div class="modal-content modal-event">
+            <div class="modal-header">
+                <div class="modal-title">
+                    <span class="modal-icon">📝</span>
+                    <div class="modal-heading">
+                        <h2 id="event-modal-heading">创建新事件</h2>
+                        <p id="event-modal-subtitle">安排具体的时间与类别</p>
+                    </div>
+                </div>
+                <button type="button" class="close-button" id="event-modal-close" aria-label="关闭">&times;</button>
+            </div>
+            <div class="modal-body">
+                <label class="modal-label" for="event-title">标题</label>
+                <input type="text" id="event-title" placeholder="请输入事件标题...">
+
+                <div class="modal-field">
+                    <label class="modal-label" for="event-date">日期</label>
+                    <input type="text" id="event-date" class="modal-datepicker" placeholder="选择日期">
+                </div>
+
+                <div class="modal-field-grid">
+                    <div class="modal-field">
+                        <label class="modal-label" for="event-start-time">开始时间</label>
+                        <input type="text" id="event-start-time" class="modal-timepicker" placeholder="09:00">
+                    </div>
+                    <div class="modal-field">
+                        <label class="modal-label" for="event-end-time">结束时间</label>
+                        <input type="text" id="event-end-time" class="modal-timepicker" placeholder="10:00">
+                    </div>
+                    <div class="modal-field modal-field--checkbox">
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="event-all-day">
+                            <span>全天</span>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="modal-field-grid modal-field-grid--meta">
+                    <div class="modal-field">
+                        <label class="modal-label" for="event-type-select">事件类型</label>
+                        <select id="event-type-select"></select>
+                    </div>
+                    <div class="modal-field">
+                        <label class="modal-label" for="event-urgency">紧急程度</label>
+                        <select id="event-urgency">
+                            <option value="" selected disabled>请选择紧急程度</option>
+                            <option value="紧急且重要">紧急且重要</option>
+                            <option value="不紧急且重要">不紧急且重要</option>
+                            <option value="紧急且不重要">紧急且不重要</option>
+                            <option value="不紧急且不重要">不紧急且不重要</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="modal-field modal-field--textarea">
+                    <label class="modal-label" for="event-remark">备注</label>
+                    <textarea id="event-remark" class="modal-textarea" rows="2" maxlength="240" placeholder="补充说明、准备事项等..."></textarea>
+                    <span class="modal-hint">最多两行，超出将自动滚动显示</span>
+                </div>
+
+                <div class="modal-section">
+                    <div class="toggle-row">
+                        <span class="toggle-text">重复事件</span>
+                        <label class="toggle">
+                            <input type="checkbox" id="event-repeat-toggle">
+                            <span class="toggle-slider"></span>
+                        </label>
+                    </div>
+                    <div id="repeat-settings" class="repeat-settings hidden">
+                        <div class="modal-field-grid modal-field-grid--meta">
+                            <div class="modal-field">
+                                <label class="modal-label" for="event-repeat-type">重复类型</label>
+                                <select id="event-repeat-type">
+                                    <option value="daily">每天</option>
+                                    <option value="workday">中国大陆法定非节假日</option>
+                                    <option value="holiday">中国大陆法定节假日</option>
+                                    <option value="weekday">周一至周五</option>
+                                    <option value="weekend">周末</option>
+                                </select>
+                            </div>
+                            <div class="modal-field">
+                                <label class="modal-label">重复结束</label>
+                                <div class="repeat-end-options">
+                                    <label><input type="radio" name="repeat-end" value="never" checked> 永久</label>
+                                    <label><input type="radio" name="repeat-end" value="date"> 指定日期</label>
+                                    <input type="text" id="event-repeat-end" class="modal-datepicker" placeholder="选择结束日期" disabled>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-actions modal-actions--multi">
+                <button type="button" class="btn-secondary" id="event-modal-cancel">取消</button>
+                <button type="button" class="btn-primary" id="save-event">保存事件</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="event-complete-modal" class="modal hidden completion-modal">
+        <div class="modal-content modal-complete">
+            <div class="modal-header">
+                <div class="modal-title">
+                    <span class="modal-icon">✅</span>
+                    <h3>完成事件</h3>
+                </div>
+                <button type="button" class="close-button" id="event-complete-close" aria-label="关闭">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p id="complete-event-title">请评价本次事件完成效率。</p>
+                <label class="modal-label" for="complete-efficiency">效率评分</label>
+                <select id="complete-efficiency">
+                    <option value="high">高</option>
+                    <option value="medium">中</option>
+                    <option value="low">低</option>
+                </select>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn-secondary" id="complete-cancel">暂不完成</button>
+                <button type="button" class="btn-primary" id="complete-confirm">确认完成</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="delete-confirm-modal" class="modal hidden">
+        <div class="modal-content modal-delete-confirm">
+            <div class="modal-header">
+                <div class="modal-title">
+                    <span class="modal-icon">⚠️</span>
+                    <h3 id="delete-confirm-title">删除事件</h3>
+                </div>
+                <button type="button" class="close-button" id="delete-confirm-close" aria-label="关闭">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p id="delete-confirm-message" class="delete-message"></p>
+                <div id="delete-options" class="delete-options hidden">
+                    <label class="delete-option-item">
+                        <input type="radio" name="delete-scope" value="single" checked>
+                        <span class="option-content">
+                            <strong>仅删除当前事件</strong>
+                            <small>只删除这一次事件</small>
+                        </span>
+                    </label>
+                    <label class="delete-option-item">
+                        <input type="radio" name="delete-scope" value="all">
+                        <span class="option-content">
+                            <strong>删除所有重复事件</strong>
+                            <small>删除这个系列的所有事件</small>
+                        </span>
+                    </label>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn-secondary" id="delete-confirm-cancel">取消</button>
+                <button type="button" class="btn-danger" id="delete-confirm-ok">确认删除</button>
+            </div>
+        </div>
+    </div>
+</div>`;

@@ -1,0 +1,16 @@
+[project]
+name = "DailyManagement"
+version = "0.1.0"
+description = "A web-based daily management tool."
+authors = ["Your Name <you@example.com>"]
+
+[dependencies]
+Flask = "^3.0.3"
+Flask-Cors = "^4.0.1"
+SQLAlchemy = "^2.0.36"
+PyMySQL = "^1.1.1"
+python-dateutil = "^2.9.0.post0"
+
+[build-system]
+requires = ["pdm-pep517"]
+build-backend = "pdm.pep517.api"

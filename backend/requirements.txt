@@ -1,0 +1,10 @@
+# Flask 主体 Web 框架
+Flask==3.0.3
+# CORS 支持中间件
+Flask-Cors==4.0.1
+# SQLAlchemy ORM 支撑库
+SQLAlchemy==2.0.36
+# MySQL 数据库驱动
+PyMySQL==1.1.1
+# 处理日期扩展依赖
+python-dateutil==2.9.0.post0

@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>日常管理系统 - 34金币法则</title>
+    <link rel="stylesheet" href="libs/flatpickr.min.css">
+    <link rel="stylesheet" href="libs/fullcalendar.min.css">
+    <link rel="stylesheet" href="libs/choices.min.css">
+    <link rel="stylesheet" href="css/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <script src="libs/particles.min.js"></script>
+    <script src="libs/lunar.min.js"></script>
+    <script src="libs/fullcalendar.min.js"></script>
+    <script src="libs/flatpickr.min.js"></script>
+    <script src="libs/flatpickr.zh.js"></script>
+    <script src="libs/choices.min.js"></script>
+</head>
+<body>
+    <!-- 动态粒子背景 -->
+    <div id="particles-js"></div>
+    
+    <div id="app">
+        <header class="tech-header">
+            <div class="header-bg"></div>
+            <div class="header-container">
+                <!-- 左侧：系统名称和标语 -->
+                <div class="header-left">
+                    <h1><span class="icon">⚡</span> 日常管理系统</h1>
+                    <p class="subtitle">34金币时间管理法则 · 让每一天都充满价值</p>
+                </div>
+                
+                <!-- 中间：导航菜单 -->
+                <nav class="header-nav">
+                    <button class="nav-btn active" data-page="ideas">
+                        <span class="nav-icon">💡</span>
+                        <span>灵感收集</span>
+                    </button>
+                    <button class="nav-btn" data-page="daily">
+                        <span class="nav-icon">📅</span>
+                        <span>日常管理</span>
+                    </button>
+                    <button class="nav-btn" data-page="stats">
+                        <span class="nav-icon">📊</span>
+                        <span>数据统计</span>
+                    </button>
+                    <button class="nav-btn" data-page="manage">
+                        <span class="nav-icon">🛠️</span>
+                        <span>管理</span>
+                    </button>
+                </nav>
+                
+                <!-- 右侧：服务健康状态 -->
+                <div class="header-right">
+                    <div class="service-health">
+                        <span class="health-icon">🩺</span>
+                        <span id="api-status-indicator" class="health-status">检测中</span>
+                    </div>
+                </div>
+            </div>
+        </header>
+        
+        <main>
+            <!-- 灵感收集页面 -->
+            <div id="page-ideas" class="page-content active">
+                <div class="glass-card">
+                    <div class="section-header">
+                        <h2><span class="icon">💡</span> 灵感收集站</h2>
+                        <select id="idea-sort" class="idea-sort-select">
+                            <option value="time">按时间排序</option>
+                            <option value="priority">按优先级排序</option>
+                        </select>
+                    </div>
+                    <div id="ideas-list" class="ideas-container"></div>
+                    <div class="input-group">
+                        <input type="text" id="new-idea" placeholder="💭 记录你的灵感和想法...">
+                        <button id="add-idea" class="btn-primary">+ 添加</button>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 日常管理页面 -->
+            <div id="page-daily" class="page-content">
+                <div class="glass-card">
+                    <div class="section-header">
+                        <h2><span class="icon">📅</span> 日程管理</h2>
+                        <div id="calendar-legend" class="calendar-legend"></div>
+                        <div class="section-actions">
+                            <div class="urgency-filter-group">
+                                <label class="filter-label" for="urgency-filter">紧急程度</label>
+                                <select id="urgency-filter" class="urgency-filter-select">
+                                    <option value="">全部紧急程度</option>
+                                    <option value="紧急且重要">紧急且重要</option>
+                                    <option value="不紧急且重要">不紧急且重要</option>
+                                    <option value="紧急且不重要">紧急且不重要</option>
+                                    <option value="不紧急且不重要">不紧急且不重要</option>
+                                </select>
+                                <button type="button" id="urgency-filter-clear" class="btn-tertiary">清空筛选</button>
+                            </div>
+                            <button id="add-event-button" class="btn-add-event">+ 新建事件</button>
+                        </div>
+                    </div>
+                    <div id="calendar-view"></div>
+                    <div id="calendar-score-bar" class="score-bar hidden"></div>
+                </div>
+            </div>
+            
+            <!-- 数据统计页面 -->
+            <div id="page-stats" class="page-content">
+                <div class="glass-card">
+                    <div class="section-header">
+                        <h2><span class="icon">📊</span> 数据统计</h2>
+                        <div class="stats-filters">
+                            <select id="stats-year" class="stats-select">
+                                <option value="">全部年份</option>
+                            </select>
+                            <select id="stats-month" class="stats-select">
+                                <option value="">全年</option>
+                                <option value="1">1月</option>
+                                <option value="2">2月</option>
+                                <option value="3">3月</option>
+                                <option value="4">4月</option>
+                                <option value="5">5月</option>
+                                <option value="6">6月</option>
+                                <option value="7">7月</option>
+                                <option value="8">8月</option>
+                                <option value="9">9月</option>
+                                <option value="10">10月</option>
+                                <option value="11">11月</option>
+                                <option value="12">12月</option>
+                            </select>
+                            <span class="badge" id="stats-update-time">加载中...</span>
+                        </div>
+                    </div>
+                    <div id="stats-container" class="stats-container">
+                        <div class="stats-loading">正在加载统计数据...</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 管理中心页面 -->
+            <div id="page-manage" class="page-content">
+                <div class="glass-card">
+                    <div class="section-header">
+                        <h2><span class="icon">🛠️</span> 管理中心</h2>
+                        <span class="badge">事件类型</span>
+                    </div>
+                    <div class="manage-grid">
+                        <section class="manage-section">
+                            <h3>已创建类型</h3>
+                            <p class="manage-hint">在这里查看或删除事件类型，保持分类清晰。</p>
+                            <div id="manage-type-list" class="manage-type-list"></div>
+                        </section>
+                        <section class="manage-section">
+                            <h3>创建新类型</h3>
+                            <p class="manage-hint">设置类型名称和颜色，方便在日历中快速识别。</p>
+                            <form id="manage-type-form" class="manage-type-form">
+                                <label class="modal-label" for="manage-type-name">类型名称</label>
+                                <input type="text" id="manage-type-name" placeholder="例如：学习、运动、亲子时间">
+                                <label class="modal-label" for="manage-type-color">类型颜色</label>
+                                <div class="manage-color-row">
+                                    <input type="color" id="manage-type-color" value="#667eea">
+                                    <input type="text" id="manage-type-color-preview" class="manage-color-preview" value="#667eea" placeholder="#667eea" maxlength="7">
+                                </div>
+                                <button type="submit" class="btn-primary manage-submit">+ 创建类型</button>
+                            </form>
+                        </section>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+    <script src="js/event-manager.js"></script>
+    <script src="js/main.js"></script>
+    <script src="js/calendar.js"></script>
+</body>
+</html>
