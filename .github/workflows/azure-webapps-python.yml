@@ -1,7 +1,7 @@
 name: Build and deploy Docker app  # 工作流名称
 
 env:
-  DOCKER_IMAGE_NAME: DailyManagement-image  # 替换为你的 Docker 镜像名称
+  DOCKER_IMAGE_NAME: dailymanagement-image  # 镜像名称全部小写
   DOCKER_REGISTRY: tonydmacr.azurecr.io  # 替换为你的 Azure 容器注册表地址
   SERVER_HOST: 20.24.210.200  # 替换为你的服务器 SSH 主机地址
   SERVER_USER: TonyAdmin  # 替换为你的服务器 SSH 用户名
