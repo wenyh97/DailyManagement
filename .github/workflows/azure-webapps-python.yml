@@ -63,9 +63,6 @@ jobs:
             docker-compose.yml
             nginx.conf
             frontend/**
-            frontend/css/
-            frontend/js/
-            frontend/libs/
           target: ${{ env.SERVER_BASE_PATH }}/deploy-temp
 
       - name: Deploy and restart services on server  # 远程部署和重启服务
