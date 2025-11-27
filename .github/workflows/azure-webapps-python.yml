@@ -46,6 +46,13 @@ jobs:
       - name: Check out code  # 检出代码（用于上传文件）
         uses: actions/checkout@v4
 
+      - name: List files for debug  # 调试：列出根目录和 frontend 目录下的文件
+        run: |
+          echo "根目录文件列表："
+          ls -al
+          echo "frontend 目录文件列表："
+          ls -al frontend || true
+
       - name: Upload files to server via scp  # 自动上传配置和静态文件
         uses: appleboy/scp-action@v0.1.7
         with:
