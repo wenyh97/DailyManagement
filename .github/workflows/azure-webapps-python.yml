@@ -1,86 +1,87 @@
-# This workflow will build and push a Python application to an Azure Web App when a commit is pushed to your default branch.
-#
-# This workflow assumes you have already created the target Azure App Service web app.
-# For instructions see https://docs.microsoft.com/en-us/azure/app-service/quickstart-python?tabs=bash&pivots=python-framework-flask
-#
-# To configure this workflow:
-#
-# 1. Download the Publish Profile for your Azure Web App. You can download this file from the Overview page of your Web App in the Azure Portal.
-#    For more information: https://docs.microsoft.com/en-us/azure/app-service/deploy-github-actions?tabs=applevel#generate-deployment-credentials
-#
-# 2. Create a secret in your repository named AZURE_WEBAPP_PUBLISH_PROFILE, paste the publish profile contents as the value of the secret.
-#    For instructions on obtaining the publish profile see: https://docs.microsoft.com/azure/app-service/deploy-github-actions#configure-the-github-secret
-#
-# 3. Change the value for the AZURE_WEBAPP_NAME. Optionally, change the PYTHON_VERSION environment variables below.
-#
-# For more information on GitHub Actions for Azure: https://github.com/Azure/Actions
-# For more information on the Azure Web Apps Deploy action: https://github.com/Azure/webapps-deploy
-# For more samples to get started with GitHub Action workflows to deploy to Azure: https://github.com/Azure/actions-workflow-samples
-
-name: Build and deploy Python app to Azure Web App
+name: Build and deploy Docker app  # 工作流名称
 
 env:
-  AZURE_WEBAPP_NAME: your-app-name  # set this to the name of your Azure Web App
-  PYTHON_VERSION: '3.8'              # set this to the Python version to use
+  DOCKER_IMAGE_NAME: DailyManagement-image  # 替换为你的 Docker 镜像名称
+  DOCKER_REGISTRY: tonydmacr.azurecr.io  # 替换为你的 Azure 容器注册表地址
+  SERVER_HOST: 20.24.210.200  # 替换为你的服务器 SSH 主机地址
+  SERVER_USER: TonyAdmin  # 替换为你的服务器 SSH 用户名
+  SERVER_BASE_PATH: /home/TonyAdmin  # 服务器基础路径
 
 on:
   push:
-    branches: [ "main" ]
-  workflow_dispatch:
+    branches: [ "main" ]  # 当推送到 main 分支时触发工作流
+  workflow_dispatch:  # 允许手动触发工作流
 
 permissions:
-  contents: read
+  contents: read  # 设置工作流权限，仅允许读取内容
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-latest  # 使用最新的 Ubuntu 运行器
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Check out code  # 检出代码
+        uses: actions/checkout@v4
 
-      - name: Set up Python version
-        uses: actions/setup-python@v3.0.0
+      - name: Log in to Azure Container Registry  # 登录到 Azure 容器注册表
+        uses: azure/docker-login@v1
         with:
-          python-version: ${{ env.PYTHON_VERSION }}
-          cache: 'pip'
+          login-server: ${{ env.DOCKER_REGISTRY }}  # 使用 Azure 容器注册表地址
+          username: ${{ secrets.AZURE_ACR_USERNAME }}  # 从 GitHub Secrets 中获取 ACR 用户名
+          password: ${{ secrets.AZURE_ACR_PASSWORD }}  # 从 GitHub Secrets 中获取 ACR 密码
 
-      - name: Create and start virtual environment
+      - name: Build Docker image  # 构建 Docker 镜像
         run: |
-          python -m venv venv
-          source venv/bin/activate
+          docker build -t ${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_IMAGE_NAME }}:latest .
 
-      - name: Install dependencies
-        run: pip install -r requirements.txt
-
-      # Optional: Add step to run tests here (PyTest, Django test suites, etc.)
-
-      - name: Upload artifact for deployment jobs
-        uses: actions/upload-artifact@v4
-        with:
-          name: python-app
-          path: |
-            .
-            !venv/
+      - name: Push Docker image to registry  # 推送 Docker 镜像到注册表
+        run: |
+          docker push ${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_IMAGE_NAME }}:latest
 
   deploy:
-    permissions:
-      contents: none
-    runs-on: ubuntu-latest
-    needs: build
-    environment:
-      name: 'Development'
-      url: ${{ steps.deploy-to-webapp.outputs.webapp-url }}
+    runs-on: ubuntu-latest  # 使用最新的 Ubuntu 运行器
+    needs: build  # 此作业依赖于 build 作业
 
     steps:
-      - name: Download artifact from build job
-        uses: actions/download-artifact@v4
-        with:
-          name: python-app
-          path: .
+      - name: Check out code  # 检出代码（用于上传文件）
+        uses: actions/checkout@v4
 
-      - name: 'Deploy to Azure Web App'
-        id: deploy-to-webapp
-        uses: azure/webapps-deploy@v2
+      - name: Upload files to server via scp  # 自动上传配置和静态文件
+        uses: appleboy/scp-action@v0.1.7
         with:
-          app-name: ${{ env.AZURE_WEBAPP_NAME }}
-          publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
+          host: ${{ env.SERVER_HOST }}
+          username: ${{ env.SERVER_USER }}
+          password: ${{ secrets.SERVER_PASSWORD }}
+          source: |
+            docker-compose.yml
+            nginx.conf
+            frontend/*
+          target: ${{ env.SERVER_BASE_PATH }}/deploy-temp
+
+      - name: Deploy and restart services on server  # 远程部署和重启服务
+        uses: appleboy/ssh-action@v0.1.8
+        with:
+          host: ${{ env.SERVER_HOST }}
+          username: ${{ env.SERVER_USER }}
+          password: ${{ secrets.SERVER_PASSWORD }}
+          script: |
+            # 移动上传的文件到对应目录
+            mv ${{ env.SERVER_BASE_PATH }}/deploy-temp/docker-compose.yml ${{ env.SERVER_BASE_PATH }}/docker-compose/docker-compose.yml
+            mv ${{ env.SERVER_BASE_PATH }}/deploy-temp/nginx.conf ${{ env.SERVER_BASE_PATH }}/nginx/nginx.conf
+            cp -r ${{ env.SERVER_BASE_PATH }}/deploy-temp/frontend/* ${{ env.SERVER_BASE_PATH }}/frontend/
+            # 拉取最新镜像
+            docker pull ${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_IMAGE_NAME }}:latest
+            # 进入 compose 目录并重启服务
+            cd ${{ env.SERVER_BASE_PATH }}/docker-compose
+            docker-compose down
+            docker-compose up -d
+            # 配置 Nginx 作为反向代理
+            docker pull nginx:latest
+            docker rm -f nginx-proxy || true
+            docker run -d --name nginx-proxy \
+              -p 80:80 \
+              -v ${{ env.SERVER_BASE_PATH }}/nginx/nginx.conf:/etc/nginx/nginx.conf:ro \
+              -v ${{ env.SERVER_BASE_PATH }}/frontend:/usr/share/nginx/html:ro \
+              --network host nginx
+            # 清理临时目录
+            rm -rf ${{ env.SERVER_BASE_PATH }}/deploy-temp

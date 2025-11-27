@@ -1,0 +1,10 @@
+version: '3.8'
+
+services:
+  backend:
+    image: tonydmacr.azurecr.io/dailymanagement-image:latest  # 替换为你的实际镜像名
+    container_name: backend
+    ports:
+      - "5000:5000"
+    environment:
+      - DATABASE_URL=${DATABASE_URL}  # 使用环境变量注入数据库连接字符串
