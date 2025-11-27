@@ -62,7 +62,7 @@ jobs:
           source: |
             docker-compose.yml
             nginx.conf
-            frontend/*.html
+            frontend/**
             frontend/css/
             frontend/js/
             frontend/libs/
