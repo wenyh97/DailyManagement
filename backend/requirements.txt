@@ -8,3 +8,5 @@ SQLAlchemy==2.0.36
 PyMySQL==1.1.1
 # 处理日期扩展依赖
 python-dateutil==2.9.0.post0
+# 生产环境 WSGI 服务器
+gunicorn
