@@ -59,10 +59,7 @@ jobs:
           host: ${{ env.SERVER_HOST }}
           username: ${{ env.SERVER_USER }}
           password: ${{ secrets.SERVER_PASSWORD }}
-          source: |
-            docker-compose.yml
-            nginx.conf
-            frontend/**
+          source: "docker-compose.yml,nginx.conf,frontend/**"  # 单行避免 CRLF 造成路径不匹配
           target: ${{ env.SERVER_BASE_PATH }}/deploy-temp
 
       - name: Deploy and restart services on server  # 远程部署和重启服务
