@@ -1,3 +1,4 @@
+#后端程序主入口
 from src.app import app  # 从 src.app 导入已配置好的 Flask 应用实例
 
 
