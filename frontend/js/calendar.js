@@ -1173,6 +1173,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 }));
                 hideContextMenu();
                 hideRemarkTooltip();
+                if (calendar) {
+                    // 重新获取事件，确保 FullCalendar 与后端状态一致，避免拖拽后短暂消失
+                    requestAnimationFrame(() => calendar.refetchEvents());
+                }
             } catch (error) {
                 console.error('[Calendar] 更新事件失败:', error);
                 if (typeof revert === 'function') {

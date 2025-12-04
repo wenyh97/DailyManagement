@@ -865,6 +865,10 @@ document.addEventListener('DOMContentLoaded', () => { // 监听页面加载完�
     const statsYearSelect = document.getElementById('stats-year');
     const statsMonthSelect = document.getElementById('stats-month');
     
+    // 统计筛选器 Choices 实例
+    let statsYearChoices = null;
+    let statsMonthChoices = null;
+    
     // 统计数据缓存
     let statsCache = {}; // 格式: { "2025_11": { data: {...}, timestamp: 123456 } }
     const STATS_CACHE_DURATION = 5 * 60 * 1000; // 缓存5分钟
@@ -880,6 +884,18 @@ document.addEventListener('DOMContentLoaded', () => { // 监听页面加载完�
             if (year === currentYear) option.selected = true;
             statsYearSelect.appendChild(option);
         }
+        
+        // 使用 Choices.js 美化下拉框
+        if (window.Choices) {
+            statsYearChoices = new Choices(statsYearSelect, {
+                searchEnabled: false,
+                itemSelectText: '',
+                shouldSort: false,
+                position: 'bottom',
+                allowHTML: false
+            });
+            statsYearChoices.containerOuter.element.classList.add('stats-filter-choices');
+        }
     };
 
     // 设置默认为当前月份
@@ -887,13 +903,40 @@ document.addEventListener('DOMContentLoaded', () => { // 监听页面加载完�
         if (!statsMonthSelect) return;
         const currentMonth = new Date().getMonth() + 1;
         statsMonthSelect.value = currentMonth;
+        
+        // 使用 Choices.js 美化下拉框
+        if (window.Choices) {
+            statsMonthChoices = new Choices(statsMonthSelect, {
+                searchEnabled: false,
+                itemSelectText: '',
+                shouldSort: false,
+                position: 'bottom',
+                allowHTML: false
+            });
+            statsMonthChoices.containerOuter.element.classList.add('stats-filter-choices');
+        }
+    };
+
+    // 获取筛选器当前值 (兼容 Choices.js)
+    const getStatsYearValue = () => {
+        if (statsYearChoices) {
+            return statsYearChoices.getValue(true);
+        }
+        return statsYearSelect?.value || '';
+    };
+    
+    const getStatsMonthValue = () => {
+        if (statsMonthChoices) {
+            return statsMonthChoices.getValue(true);
+        }
+        return statsMonthSelect?.value || '';
     };
 
     const loadStats = async (forceRefresh = false) => {
         if (!statsContainer) return;
         
-        const year = statsYearSelect?.value || '';
-        const month = statsMonthSelect?.value || '';
+        const year = getStatsYearValue();
+        const month = getStatsMonthValue();
         const cacheKey = `${year}_${month}`;
         
         // 检查缓存

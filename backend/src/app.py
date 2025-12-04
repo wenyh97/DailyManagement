@@ -604,11 +604,11 @@ def register_routes(app: Flask) -> None:  # 定义路由注册函数以保持结
             record_rate = 0
             total_recorded_hours = 0
             if year and month and days_in_period > 0:
-                # 计算当月所有事件的总时长（小时）
-                events = event_query.all()
-                for event in events:
-                    if event.start and event.end:
-                        duration = (event.end - event.start).total_seconds() / 3600  # 转换为小时
+                # 计算当月所有事件的总时长（小时），排除全天事件
+                duration_events = event_query.filter(Event.allDay == False).with_entities(Event.start, Event.end).all()
+                for event_start, event_end in duration_events:
+                    if event_start and event_end:
+                        duration = (event_end - event_start).total_seconds() / 3600  # 转换为小时
                         total_recorded_hours += duration
                 
                 # 记录率 = 当月记录的时间总数 / (当月天数 * 17)
