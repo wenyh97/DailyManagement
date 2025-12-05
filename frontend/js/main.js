@@ -1,5 +1,5 @@
 document.addEventListener('DOMContentLoaded', () => { // 监听页面加载完成事件
-    const apiUrl = 'http://127.0.0.1:5000'; // 定义后端接口基础地址
+    const apiUrl = typeof API_BASE_URL !== 'undefined' ? API_BASE_URL : 'http://127.0.0.1:5000';
     const apiStatusIndicator = document.getElementById('api-status-indicator'); // 获取状态徽章元素
     const ideasList = document.getElementById('ideas-list'); // 获取灵感收纳箱容器元素
     const newIdeaInput = document.getElementById('new-idea'); // 获取灵感输入框元素
@@ -172,11 +172,9 @@ document.addEventListener('DOMContentLoaded', () => { // 监听页面加载完�
 
     const updateApiStatus = async () => { // 定义异步函数用于刷新后端健康状态
         try { // 捕获潜在网络异常
-            const response = await fetch(`${apiUrl}/health`); // 请求后端健康检查接口
-            if (!response.ok) { // 判断响应是否成功
-                throw new Error('健康检查返回非 200 状态'); // 抛出异常以触发下方处理
-            } // if 分支结束
-            await response.json(); // 解析后端返回的 JSON 数据
+            // 使用 apiRequest 替代原生 fetch，虽然 health 接口可能不需要认证，但保持一致性
+            // 注意：apiRequest 默认会抛出错误如果 status 不为 ok，所以这里不需要手动检查 response.ok
+            await apiRequest('/health'); 
             apiStatusIndicator.textContent = '在线'; // 更新徽章文本提示在线
             apiStatusIndicator.className = 'health-status online'; // 添加在线样式
         } catch (error) { // 处理请求异常
@@ -407,19 +405,17 @@ document.addEventListener('DOMContentLoaded', () => { // 监听页面加载完�
                 let response;
                 if (editingTypeId) {
                     // 编辑模式
-                    response = await fetch(`${apiUrl}/event-types/${editingTypeId}`, {
-                        method: 'PUT',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ name, color })
-                    });
+                    response = await apiRequest(`/event-types/${editingTypeId}`, 'PUT', { name, color });
                 } else {
                     // 创建模式
-                    response = await fetch(`${apiUrl}/event-types`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ name, color })
-                    });
+                    response = await apiRequest('/event-types', 'POST', { name, color });
                 }
+                // apiRequest 已经在非 ok 状态下抛出错误，或者返回 response 对象
+                // 但是 apiRequest 的实现是返回 response 对象，我们需要检查 response.ok 吗？
+                // 让我们再看一眼 auth.js 的实现。
+                // auth.js: const response = await fetch(...); if (401/422) ...; return response;
+                // 所以 apiRequest 返回的是 response 对象。
+                
                 if (!response.ok) {
                     let message = editingTypeId ? '更新类型失败，请稍后重试' : '创建类型失败，请稍后重试';
                     if (response.status === 409) {
@@ -505,7 +501,7 @@ document.addEventListener('DOMContentLoaded', () => { // 监听页面加载完�
             }
             try {
                 await ensureEventTypesLoaded();
-                const response = await fetch(`${apiUrl}/event-types/${typeId}`, { method: 'DELETE' });
+                const response = await apiRequest(`/event-types/${typeId}`, 'DELETE');
                 if (!response.ok) {
                     const message = await response.text();
                     throw new Error(message || '删除类型失败');
@@ -590,11 +586,7 @@ document.addEventListener('DOMContentLoaded', () => { // 监听页面加载完�
         const priority = editPriorityChoices ? editPriorityChoices.getValue(true) : editIdeaPrioritySelect.value;
         
         try {
-            const response = await fetch(`${apiUrl}/ideas/${editingIdeaId}`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ text, priority })
-            });
+            const response = await apiRequest(`/ideas/${editingIdeaId}`, 'PUT', { text, priority });
             if (!response.ok) {
                 throw new Error('更新灵感失败');
             }
@@ -734,7 +726,7 @@ document.addEventListener('DOMContentLoaded', () => { // 监听页面加载完�
     };
 
     const fetchIdeas = async () => { // 定义异步函数用于获取灵感收纳箱
-        const response = await fetch(`${apiUrl}/ideas`); // 请求灵感收纳箱接口
+        const response = await apiRequest('/ideas'); // 请求灵感收纳箱接口
         const ideas = await response.json(); // 解析返回的灵感数组
         ideasCache = ideas; // 缓存最新灵感数据
         const sortType = getIdeaSortValue();
@@ -773,7 +765,7 @@ document.addEventListener('DOMContentLoaded', () => { // 监听页面加载完�
             const ideaId = target.dataset.id; // 读取按钮上的灵感标识
             const confirmDelete = confirm('确定要删除这条灵感吗？'); // 弹出确认框
             if (!confirmDelete) return; // 如果用户取消，直接返回
-            await fetch(`${apiUrl}/ideas/${ideaId}`, { method: 'DELETE' }); // 调用删除接口
+            await apiRequest(`/ideas/${ideaId}`, 'DELETE'); // 调用删除接口
             await fetchIdeas(); // 重新获取灵感收纳箱
             await updateApiStatus(); // 更新健康状态统计数据
         } // if 结束
@@ -819,16 +811,12 @@ document.addEventListener('DOMContentLoaded', () => { // 监听页面加载完�
         };
 
         try {
-            const response = await fetch(`${apiUrl}/events`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
-            });
+            const response = await apiRequest('/events', 'POST', payload);
             if (!response.ok) {
                 const message = await response.text();
                 throw new Error(message || '创建事件失败');
             }
-            const deleteResponse = await fetch(`${apiUrl}/ideas/${convertIdeaContext.id}`, { method: 'DELETE' });
+            const deleteResponse = await apiRequest(`/ideas/${convertIdeaContext.id}`, 'DELETE');
             if (!deleteResponse.ok) {
                 throw new Error('事件已创建，但删除灵感失败');
             }
@@ -845,11 +833,7 @@ document.addEventListener('DOMContentLoaded', () => { // 监听页面加载完�
     addIdeaButton.addEventListener('click', async () => { // 监听添加灵感按钮点击
         const text = newIdeaInput.value.trim(); // 获取并清理输入内容
         if (text) { // 判断输入是否为空
-            await fetch(`${apiUrl}/ideas`, { // 调用新增灵感接口
-                method: 'POST', // 使用 POST 方法
-                headers: { 'Content-Type': 'application/json' }, // 指定请求头为 JSON
-                body: JSON.stringify({ text }) // 序列化请求体
-            }); // 请求结束
+            await apiRequest('/ideas', 'POST', { text }); // 调用新增灵感接口
             newIdeaInput.value = ''; // 清空输入框
             await fetchIdeas(); // 刷新灵感收纳箱
             await updateApiStatus(); // 更新健康状态统计
@@ -966,13 +950,13 @@ document.addEventListener('DOMContentLoaded', () => { // 监听页面加载完�
         }
         
         try {
-            let url = `${apiUrl}/stats`;
+            let endpoint = '/stats';
             const params = [];
             if (year) params.push(`year=${year}`);
             if (month) params.push(`month=${month}`);
-            if (params.length > 0) url += '?' + params.join('&');
+            if (params.length > 0) endpoint += '?' + params.join('&');
             
-            const response = await fetch(url);
+            const response = await apiRequest(endpoint);
             if (!response.ok) {
                 throw new Error('获取统计数据失败');
             }

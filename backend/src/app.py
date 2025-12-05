@@ -5,6 +5,8 @@ from uuid import uuid4  # 引入 uuid4 用于生成唯一标识符
 from flask import Flask, jsonify, request  # 引入 Flask 核心类以及 JSON 工具
 
 from flask_cors import CORS  # 引入 CORS 以支持跨域请求
+from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity, get_jwt
+from werkzeug.security import generate_password_hash, check_password_hash
 import logging
 from sqlalchemy.exc import IntegrityError
 
@@ -13,6 +15,7 @@ from .models.event import Event
 from .models.idea import Idea
 from .models.event_type import EventType
 from .models.daily_score import DailyScore
+from .models.user import User
 from .utils import event_to_dict, idea_to_dict, event_type_to_dict, daily_score_to_dict
 from .services.event_service import (
     generate_repeat_events,
@@ -39,6 +42,27 @@ def create_app() -> Flask:  # 创建并配置 Flask 应用的工厂函数
     app.config.from_object(Config)
     # 日志配置：INFO 级别，输出到控制台
     logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s %(message)s')
+    
+    # JWT 配置
+    app.config["JWT_SECRET_KEY"] = "your-super-secret-key-change-in-production"
+    app.config["JWT_ACCESS_TOKEN_EXPIRES"] = timedelta(hours=24)
+    jwt = JWTManager(app)
+
+    @jwt.invalid_token_loader
+    def invalid_token_callback(error):
+        logging.error(f"Invalid Token: {error}")
+        return jsonify({"error": "Invalid token", "details": error}), 422
+
+    @jwt.unauthorized_loader
+    def missing_token_callback(error):
+        logging.error(f"Missing Token: {error}")
+        return jsonify({"error": "Request does not contain an access token", "details": error}), 401
+
+    @jwt.expired_token_loader
+    def expired_token_callback(jwt_header, jwt_payload):
+        logging.error(f"Expired Token: {jwt_payload}")
+        return jsonify({"error": "Token has expired", "token_expired": True}), 401
+
     CORS(app)
     register_routes(app)
     init_db()
@@ -80,17 +104,197 @@ def register_routes(app: Flask) -> None:  # 定义路由注册函数以保持结
         return jsonify(payload), 200  # 返回健康信息
 
 
-    @app.route("/events", methods=["GET"])
-    def list_events():
+    # --- Auth Routes ---
+    @app.route("/api/auth/register", methods=["POST"])
+    def register():
+        data = request.get_json()
+        username = data.get("username")
+        password = data.get("password")
+        
+        if not username or not password:
+            return jsonify({"error": "Username and password are required"}), 400
+            
         session = SessionLocal()
         try:
-            events = session.query(Event).all()
+            if session.query(User).filter_by(username=username).first():
+                return jsonify({"error": "Username already exists"}), 400
+                
+            user = User(
+                username=username,
+                password_hash=generate_password_hash(password),
+                is_admin=False # Default to normal user
+            )
+            session.add(user)
+            session.flush() # Get user ID
+
+            # Initialize default event types for new user
+            default_types = [
+                {"name": "工作", "color": "#3b82f6"},
+                {"name": "学习", "color": "#10b981"},
+                {"name": "生活", "color": "#f59e0b"},
+                {"name": "娱乐", "color": "#ef4444"},
+                {"name": "运动", "color": "#8b5cf6"}
+            ]
+            for dt in default_types:
+                session.add(EventType(
+                    id=uuid4().hex,
+                    name=dt["name"],
+                    color=dt["color"],
+                    user_id=user.id
+                ))
+
+            session.commit()
+            return jsonify({"message": "User registered successfully"}), 201
+        except Exception as e:
+            session.rollback()
+            raise e
+        finally:
+            session.close()
+
+    @app.route("/api/auth/login", methods=["POST"])
+    def login():
+        data = request.get_json()
+        username = data.get("username")
+        password = data.get("password")
+        
+        session = SessionLocal()
+        try:
+            user = session.query(User).filter_by(username=username).first()
+            if not user or not check_password_hash(user.password_hash, password):
+                return jsonify({"error": "Invalid username or password"}), 401
+                
+            access_token = create_access_token(identity=str(user.id), additional_claims={"is_admin": user.is_admin, "username": user.username})
+            return jsonify({"access_token": access_token, "user": user.to_dict()}), 200
+        finally:
+            session.close()
+
+    @app.route("/api/auth/me", methods=["GET"])
+    @jwt_required()
+    def me():
+        current_user_id = get_jwt_identity()
+        session = SessionLocal()
+        try:
+            user = session.query(User).get(int(current_user_id))
+            if not user:
+                return jsonify({"error": "User not found"}), 404
+            return jsonify(user.to_dict()), 200
+        finally:
+            session.close()
+
+    # --- User Management Routes (Admin only) ---
+    @app.route("/api/users", methods=["GET"])
+    @jwt_required()
+    def list_users():
+        claims = get_jwt()
+        if not claims.get("is_admin"):
+            return jsonify({"error": "Admin access required"}), 403
+            
+        session = SessionLocal()
+        try:
+            users = session.query(User).all()
+            return jsonify([u.to_dict() for u in users]), 200
+        finally:
+            session.close()
+
+    @app.route("/api/users", methods=["POST"])
+    @jwt_required()
+    def create_user():
+        claims = get_jwt()
+        if not claims.get("is_admin"):
+            return jsonify({"error": "Admin access required"}), 403
+            
+        data = request.get_json()
+        username = data.get("username")
+        password = data.get("password")
+        is_admin = data.get("is_admin", False)
+        
+        if not username or not password:
+            return jsonify({"error": "Username and password are required"}), 400
+            
+        session = SessionLocal()
+        try:
+            if session.query(User).filter_by(username=username).first():
+                return jsonify({"error": "Username already exists"}), 400
+                
+            user = User(
+                username=username,
+                password_hash=generate_password_hash(password),
+                is_admin=is_admin
+            )
+            session.add(user)
+            session.commit()
+            return jsonify(user.to_dict()), 201
+        except Exception as e:
+            session.rollback()
+            raise e
+        finally:
+            session.close()
+
+    @app.route("/api/users/<int:user_id>", methods=["PUT"])
+    @jwt_required()
+    def update_user(user_id):
+        claims = get_jwt()
+        if not claims.get("is_admin"):
+            return jsonify({"error": "Admin access required"}), 403
+            
+        data = request.get_json()
+        session = SessionLocal()
+        try:
+            user = session.query(User).get(user_id)
+            if not user:
+                return jsonify({"error": "User not found"}), 404
+                
+            if "password" in data:
+                user.password_hash = generate_password_hash(data["password"])
+            if "is_admin" in data:
+                user.is_admin = data["is_admin"]
+                
+            session.commit()
+            return jsonify(user.to_dict()), 200
+        except Exception as e:
+            session.rollback()
+            raise e
+        finally:
+            session.close()
+
+    @app.route("/api/users/<int:user_id>", methods=["DELETE"])
+    @jwt_required()
+    def delete_user(user_id):
+        claims = get_jwt()
+        if not claims.get("is_admin"):
+            return jsonify({"error": "Admin access required"}), 403
+            
+        session = SessionLocal()
+        try:
+            user = session.query(User).get(user_id)
+            if not user:
+                return jsonify({"error": "User not found"}), 404
+                
+            session.delete(user)
+            session.commit()
+            return jsonify({"message": "User deleted"}), 200
+        except Exception as e:
+            session.rollback()
+            raise e
+        finally:
+            session.close()
+
+
+    @app.route("/events", methods=["GET"])
+    @jwt_required()
+    def list_events():
+        current_user_id = int(get_jwt_identity())
+        session = SessionLocal()
+        try:
+            events = session.query(Event).filter_by(user_id=current_user_id).all()
             return jsonify([event_to_dict(e) for e in events]), 200
         finally:
             session.close()
 
     @app.route("/events", methods=["POST"])
+    @jwt_required()
     def create_event():
+        current_user_id = int(get_jwt_identity())
         payload = request.get_json(force=True)
         session = SessionLocal()
         try:
@@ -124,6 +328,7 @@ def register_routes(app: Flask) -> None:  # 定义路由注册函数以保持结
                 # 生成重复事件
                 events = generate_repeat_events(base_event_data, repeat_type, repeat_end_date)
                 for event in events:
+                    event.user_id = current_user_id
                     session.add(event)
                 session.commit()
                 clear_stats_cache()  # 清除统计缓存
@@ -144,9 +349,9 @@ def register_routes(app: Flask) -> None:  # 定义路由注册函数以保持结
                     category=payload.get("category", "默认"),
                     time=payload.get("time", ""),
                     urgency=payload.get("urgency", "普通"),
-                    is_repeat=False,
                     remark=remark_value,
-                    custom_type_id=payload.get("customTypeId")
+                    custom_type_id=payload.get("customTypeId"),
+                    user_id=current_user_id
                 )
                 session.add(event)
                 session.commit()
@@ -156,11 +361,13 @@ def register_routes(app: Flask) -> None:  # 定义路由注册函数以保持结
             session.close()
 
     @app.route("/events/<event_id>", methods=["PUT"])
+    @jwt_required()
     def update_event(event_id: str):
+        current_user_id = int(get_jwt_identity())
         payload = request.get_json(force=True)
         session = SessionLocal()
         try:
-            event = session.query(Event).filter(Event.id == event_id).first()
+            event = session.query(Event).filter(Event.id == event_id, Event.user_id == current_user_id).first()
             if not event:
                 return jsonify({"error": "事件不存在"}), 404
             original_date = event.start.date() if event.start else None
@@ -196,8 +403,8 @@ def register_routes(app: Flask) -> None:  # 定义路由注册函数以保持结
 
             if event.is_completed:
                 if original_date and event.start and event.start.date() != original_date:
-                    recalculate_daily_score_for_date(session, original_date)
-                calculate_and_update_daily_score(session, event)
+                    recalculate_daily_score_for_date(session, original_date, current_user_id)
+                calculate_and_update_daily_score(session, event, current_user_id)
 
             session.commit()
             clear_stats_cache()  # 清除统计缓存
@@ -206,11 +413,13 @@ def register_routes(app: Flask) -> None:  # 定义路由注册函数以保持结
             session.close()
 
     @app.route("/events/<event_id>", methods=["DELETE"])
+    @jwt_required()
     def delete_event(event_id: str):
+        current_user_id = int(get_jwt_identity())
         delete_all = request.args.get('deleteAll', 'false').lower() == 'true'
         session = SessionLocal()
         try:
-            event = session.query(Event).filter(Event.id == event_id).first()
+            event = session.query(Event).filter(Event.id == event_id, Event.user_id == current_user_id).first()
             if not event:
                 return jsonify({"error": "事件不存在"}), 404
 
@@ -219,7 +428,8 @@ def register_routes(app: Flask) -> None:  # 定义路由注册函数以保持结
             if delete_all and event.is_repeat and event.repeat_group_id:
                 # 删除所有重复事件
                 repeat_events = session.query(Event).filter(
-                    Event.repeat_group_id == event.repeat_group_id
+                    Event.repeat_group_id == event.repeat_group_id,
+                    Event.user_id == current_user_id
                 ).all()
                 
                 for repeat_event in repeat_events:
@@ -235,7 +445,7 @@ def register_routes(app: Flask) -> None:  # 定义路由注册函数以保持结
             session.flush()
             # 重新计算受影响日期的积分
             for date in affected_dates:
-                recalculate_daily_score_for_date(session, date)
+                recalculate_daily_score_for_date(session, date, current_user_id)
             session.commit()
             clear_stats_cache()  # 清除统计缓存
             return jsonify({"status": "deleted"}), 200
@@ -243,11 +453,13 @@ def register_routes(app: Flask) -> None:  # 定义路由注册函数以保持结
             session.close()
 
     @app.route("/events/<event_id>/complete", methods=["POST"])
+    @jwt_required()
     def complete_event(event_id: str):
+        current_user_id = int(get_jwt_identity())
         payload = request.get_json(force=True)
         session = SessionLocal()
         try:
-            event = session.query(Event).filter(Event.id == event_id).first()
+            event = session.query(Event).filter(Event.id == event_id, Event.user_id == current_user_id).first()
             if not event:
                 return jsonify({"error": "事件不存在"}), 404
             
@@ -258,7 +470,7 @@ def register_routes(app: Flask) -> None:  # 定义路由注册函数以保持结
             event.is_completed = True
             event.efficiency = efficiency
             session.flush()
-            calculate_and_update_daily_score(session, event)
+            calculate_and_update_daily_score(session, event, current_user_id)
             session.commit()
             clear_stats_cache()  # 清除统计缓存
             return jsonify(event_to_dict(event)), 200
@@ -266,10 +478,12 @@ def register_routes(app: Flask) -> None:  # 定义路由注册函数以保持结
             session.close()
 
     @app.route("/events/<event_id>/complete", methods=["DELETE"])
+    @jwt_required()
     def undo_complete_event(event_id: str):
+        current_user_id = int(get_jwt_identity())
         session = SessionLocal()
         try:
-            event = session.query(Event).filter(Event.id == event_id).first()
+            event = session.query(Event).filter(Event.id == event_id, Event.user_id == current_user_id).first()
             if not event:
                 return jsonify({"error": "事件不存在"}), 404
 
@@ -279,7 +493,7 @@ def register_routes(app: Flask) -> None:  # 定义路由注册函数以保持结
             event.is_completed = False
             event.efficiency = None
             session.flush()
-            calculate_and_update_daily_score(session, event)
+            calculate_and_update_daily_score(session, event, current_user_id)
             session.commit()
             clear_stats_cache()  # 清除统计缓存
             return jsonify(event_to_dict(event)), 200
@@ -287,16 +501,20 @@ def register_routes(app: Flask) -> None:  # 定义路由注册函数以保持结
             session.close()
 
     @app.route("/ideas", methods=["GET"])
+    @jwt_required()
     def list_ideas():
+        current_user_id = int(get_jwt_identity())
         session = SessionLocal()
         try:
-            ideas = session.query(Idea).order_by(Idea.createdAt.desc()).all()
+            ideas = session.query(Idea).filter_by(user_id=current_user_id).order_by(Idea.createdAt.desc()).all()
             return jsonify([idea_to_dict(i) for i in ideas]), 200
         finally:
             session.close()
 
     @app.route("/ideas", methods=["POST"])
+    @jwt_required()
     def create_idea():
+        current_user_id = int(get_jwt_identity())
         payload = request.get_json(force=True)
         session = SessionLocal()
         try:
@@ -304,7 +522,8 @@ def register_routes(app: Flask) -> None:  # 定义路由注册函数以保持结
                 id=uuid4().hex,
                 text=payload.get("text", "新的灵感"),
                 priority=payload.get("priority", "medium"),
-                createdAt=datetime.utcnow()
+                createdAt=datetime.utcnow(),
+                user_id=current_user_id
             )
             session.add(idea)
             session.commit()
@@ -313,11 +532,13 @@ def register_routes(app: Flask) -> None:  # 定义路由注册函数以保持结
             session.close()
 
     @app.route("/ideas/<idea_id>", methods=["PUT"])
+    @jwt_required()
     def update_idea(idea_id: str):
+        current_user_id = int(get_jwt_identity())
         payload = request.get_json(force=True)
         session = SessionLocal()
         try:
-            idea = session.query(Idea).filter(Idea.id == idea_id).first()
+            idea = session.query(Idea).filter(Idea.id == idea_id, Idea.user_id == current_user_id).first()
             if not idea:
                 return jsonify({"error": "灵感不存在"}), 404
             
@@ -524,6 +745,7 @@ def register_routes(app: Flask) -> None:  # 定义路由注册函数以保持结
 
     # 数据统计 API（支持年度/月度筛选）
     @app.route("/stats", methods=["GET"])
+    @jwt_required()
     def get_stats():
         """
         获取系统统计数据，包括事件数量、积分统计、记录率等关键指标
@@ -532,18 +754,19 @@ def register_routes(app: Flask) -> None:  # 定义路由注册函数以保持结
         - year: 年份(可选)，如 2025
         - month: 月份(可选，1-12)，需配合 year 使用
         """
+        current_user_id = int(get_jwt_identity())
         year = request.args.get('year', type=int)
         month = request.args.get('month', type=int)
         
         # 构建缓存键
-        cache_key = f"{year or 'all'}_{month or 'all'}"
+        cache_key = f"{current_user_id}_{year or 'all'}_{month or 'all'}"
         
         # 检查缓存是否有效
         now = datetime.utcnow()
         if (cache_key in stats_cache and 
             stats_cache[cache_key].get('data') is not None and 
             stats_cache[cache_key].get('timestamp') is not None and 
-            (now - stats_cache[cache_key]['timestamp']).total_seconds() < stats_cache['ttl']):
+            (now - stats_cache[cache_key]['timestamp']).total_seconds() < stats_cache[cache_key]['ttl']):
             logging.info(f"返回缓存的统计数据: {cache_key}")
             return jsonify(stats_cache[cache_key]['data']), 200
         
@@ -553,8 +776,8 @@ def register_routes(app: Flask) -> None:  # 定义路由注册函数以保持结
             from calendar import monthrange
             
             # 构建时间过滤条件
-            event_query = session.query(Event)
-            score_query = session.query(DailyScore)
+            event_query = session.query(Event).filter(Event.user_id == current_user_id)
+            score_query = session.query(DailyScore).filter(DailyScore.user_id == current_user_id)
             
             start_date = None
             end_date = None
@@ -617,8 +840,10 @@ def register_routes(app: Flask) -> None:  # 定义路由注册函数以保持结
             
             # 统计事件类型分布
             type_distribution = []
-            event_types = session.query(EventType).all()
+            event_types = session.query(EventType).filter_by(user_id=current_user_id).all()
             for event_type in event_types:
+                # Re-use event_query but with custom_type_id filter
+                # Note: event_query already has user_id filter
                 type_count = event_query.filter(Event.custom_type_id == event_type.id).count()
                 if type_count > 0:
                     type_distribution.append({
@@ -702,6 +927,61 @@ def seed_demo_data() -> None:  # 定义示例数据填充函数
             "text": "利用番茄钟规划任务。",  # 示例灵感内容
             "createdAt": datetime.utcnow().isoformat() + "Z"  # 示例灵感创建时间
         })  # 示例灵感生成完成
+
+    # Seed Admin User in DB
+    session = SessionLocal()
+    try:
+        # Check if User table exists and has users
+        # Note: init_db() is called before this, so table should exist.
+        admin = session.query(User).filter_by(username="admin").first()
+        if not admin:
+            # If no admin user, check if any user exists (to avoid overwriting if someone renamed admin)
+            # But here we specifically want to ensure 'admin' exists for default data ownership
+            if not session.query(User).first():
+                admin = User(
+                    username="admin",
+                    password_hash=generate_password_hash("admin123"),
+                    is_admin=True
+                )
+                session.add(admin)
+                session.flush()
+                
+                # Initialize default event types for admin
+                default_types = [
+                    {"name": "工作", "color": "#3b82f6"},
+                    {"name": "学习", "color": "#10b981"},
+                    {"name": "生活", "color": "#f59e0b"},
+                    {"name": "娱乐", "color": "#ef4444"},
+                    {"name": "运动", "color": "#8b5cf6"}
+                ]
+                for dt in default_types:
+                    session.add(EventType(
+                        id=uuid4().hex,
+                        name=dt["name"],
+                        color=dt["color"],
+                        user_id=admin.id
+                    ))
+                    
+                session.commit()
+                logging.info("Created default admin user: admin/admin123")
+        
+        # Migrate existing data (user_id is NULL) to admin
+        if admin:
+            from sqlalchemy import text
+            tables = ['events', 'ideas', 'daily_scores', 'event_types']
+            for table in tables:
+                # Check if table has user_id column and update
+                # We assume columns exist because init_db ran
+                try:
+                    session.execute(text(f"UPDATE {table} SET user_id = :uid WHERE user_id IS NULL"), {"uid": admin.id})
+                except Exception as e:
+                    logging.warning(f"Migration for table {table} failed (maybe column missing?): {e}")
+            session.commit()
+            
+    except Exception as e:
+        logging.error(f"Seeding/Migration failed: {e}")
+    finally:
+        session.close()
 
 
 app = create_app()  # 创建全局应用实例供 WSGI 使用

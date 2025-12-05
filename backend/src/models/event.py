@@ -23,11 +23,13 @@ class Event(Base):
     efficiency = Column(String(16), default=None, index=True)  # 添加索引优化效率统计
     # 新增字段：自定义类型
     custom_type_id = Column(String(32), ForeignKey('event_types.id'), default=None, index=True)  # 添加索引优化类型统计
-    
+    user_id = Column(Integer, ForeignKey('users.id'), nullable=True, index=True) # 关联用户ID
+
     # 复合索引优化常见查询
     __table_args__ = (
         Index('idx_start_completed', 'start', 'is_completed'),  # 优化按时间和完成状态组合查询
         Index('idx_type_completed', 'custom_type_id', 'is_completed'),  # 优化按类型和完成状态组合查询
+        Index('idx_user_start', 'user_id', 'start'), # 优化用户时间范围查询
     )
 
 # models/idea.py

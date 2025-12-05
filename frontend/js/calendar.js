@@ -1,5 +1,5 @@
 document.addEventListener('DOMContentLoaded', () => {
-    const apiUrl = 'http://127.0.0.1:5000';
+    const apiUrl = typeof API_BASE_URL !== 'undefined' ? API_BASE_URL : 'http://127.0.0.1:5000';
     const calendarEl = document.getElementById('calendar-view');
     const scoreBarEl = document.getElementById('calendar-score-bar');
     const urgencyFilterSelect = document.getElementById('urgency-filter');
@@ -424,9 +424,7 @@ document.addEventListener('DOMContentLoaded', () => {
         completionLocks.add(eventId);
         const previousProps = { ...(calendarEvent.extendedProps || {}) };
         try {
-            const response = await fetch(`${apiUrl}/events/${eventId}/complete`, {
-                method: 'DELETE'
-            });
+            const response = await apiRequest(`/events/${eventId}/complete`, 'DELETE');
             if (!response.ok) {
                 const message = await response.text();
                 throw new Error(message || '取消完成状态失败');
@@ -566,7 +564,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const loadEvents = async (info, successCallback, failureCallback) => {
         try {
             await ensureEventManagerReady();
-            const response = await fetch(`${apiUrl}/events`);
+            const response = await apiRequest('/events');
             if (!response.ok) {
                 throw new Error('加载事件失败');
             }
@@ -839,8 +837,8 @@ document.addEventListener('DOMContentLoaded', () => {
             endInclusive.setDate(endInclusive.getDate() - 1);
             const startParam = `${formatDateKey(start)}T00:00:00`;
             const endParam = `${formatDateKey(endInclusive)}T23:59:59`;
-            const url = `${apiUrl}/daily-scores?start_date=${encodeURIComponent(startParam)}&end_date=${encodeURIComponent(endParam)}`;
-            const response = await fetch(url);
+            const endpoint = `/daily-scores?start_date=${encodeURIComponent(startParam)}&end_date=${encodeURIComponent(endParam)}`;
+            const response = await apiRequest(endpoint);
             if (!response.ok) {
                 throw new Error('加载积分失败');
             }
@@ -908,7 +906,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     updatePosition(); // 初始定位（显示加载中）
                     
                     try {
-                        const res = await fetch(`${apiUrl}/daily-score-details?date=${dateKey}`);
+                        const res = await apiRequest(`/daily-score-details?date=${dateKey}`);
                         if (!res.ok) throw new Error('加载详情失败');
                         const details = await res.json();
                         
@@ -992,7 +990,7 @@ document.addEventListener('DOMContentLoaded', () => {
         
         try {
             await ensureEventManagerReady();
-            const response = await fetch(`${apiUrl}/event-types`);
+            const response = await apiRequest('/event-types');
             if (!response.ok) return;
             const types = await response.json();
             
@@ -1141,11 +1139,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             
             try {
-                const response = await fetch(`${apiUrl}/events/${calendarEvent.id}`, {
-                    method: 'PUT',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload)
-                });
+                const response = await apiRequest(`/events/${calendarEvent.id}`, 'PUT', payload);
                 if (!response.ok) {
                     const message = await response.text();
                     throw new Error(message || '更新事件失败');

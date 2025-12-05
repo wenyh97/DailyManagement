@@ -432,7 +432,7 @@
 
         async _loadEventTypes() {
             try {
-                const response = await fetch(`${this.apiUrl}/event-types`);
+                const response = await apiRequest('/event-types');
                 if (!response.ok) throw new Error('加载事件类型失败');
                 this.eventTypes = await response.json();
                 const selected = this._getSelectedTypeId();
@@ -630,17 +630,9 @@
                 const payload = this._collectFormData();
                 let response;
                 if (this.mode === 'edit' && this.currentEventId) {
-                    response = await fetch(`${this.apiUrl}/events/${this.currentEventId}`, {
-                        method: 'PUT',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(payload)
-                    });
+                    response = await apiRequest(`/events/${this.currentEventId}`, 'PUT', payload);
                 } else {
-                    response = await fetch(`${this.apiUrl}/events`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(payload)
-                    });
+                    response = await apiRequest('/events', 'POST', payload);
                 }
                 if (!response.ok) {
                     const message = await response.text();
@@ -728,13 +720,11 @@
                 if (fromModal && this.deleteButton) {
                     this.deleteButton.disabled = true;
                 }
-                const url = deleteAll
-                    ? `${this.apiUrl}/events/${id}?deleteAll=true`
-                    : `${this.apiUrl}/events/${id}`;
+                const endpoint = deleteAll
+                    ? `/events/${id}?deleteAll=true`
+                    : `/events/${id}`;
 
-                const response = await fetch(url, {
-                    method: 'DELETE'
-                });
+                const response = await apiRequest(endpoint, 'DELETE');
                 if (!response.ok) {
                     const message = await response.text();
                     throw new Error(message || '删除事件失败');
@@ -1046,11 +1036,7 @@
                 const efficiencyValue = this.completeEfficiencyChoices 
                     ? this.completeEfficiencyChoices.getValue(true)
                     : this.completeEfficiency.value;
-                const response = await fetch(`${this.apiUrl}/events/${this.completingEvent.id}/complete`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ efficiency: efficiencyValue })
-                });
+                const response = await apiRequest(`/events/${this.completingEvent.id}/complete`, 'POST', { efficiency: efficiencyValue });
                 if (!response.ok) {
                     const message = await response.text();
                     throw new Error(message || '完成事件失败');

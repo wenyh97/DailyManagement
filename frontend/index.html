@@ -15,6 +15,10 @@
     <script src="libs/flatpickr.min.js"></script>
     <script src="libs/flatpickr.zh.js"></script>
     <script src="libs/choices.min.js"></script>
+    <script src="js/auth.js"></script>
+    <script>
+        checkLogin();
+    </script>
 </head>
 <body>
     <!-- 动态粒子背景 -->
@@ -44,14 +48,18 @@
                         <span class="nav-icon">📊</span>
                         <span>数据统计</span>
                     </button>
-                    <button class="nav-btn" data-page="manage">
+                    <button class="nav-btn" data-page="manage" id="nav-manage">
                         <span class="nav-icon">🛠️</span>
                         <span>管理</span>
                     </button>
                 </nav>
                 
-                <!-- 右侧：服务健康状态 -->
-                <div class="header-right">
+                <!-- 右侧：用户信息与服务健康 -->
+                <div class="header-right" style="display: flex; align-items: center; gap: 15px;">
+                    <div class="user-info" style="color: white; display: flex; align-items: center; gap: 10px;">
+                        <span id="user-display-name"></span>
+                        <button onclick="logout()" style="background: rgba(255,255,255,0.2); border: none; color: white; padding: 5px 10px; border-radius: 4px; cursor: pointer;">退出</button>
+                    </div>
                     <div class="service-health">
                         <span class="health-icon">🩺</span>
                         <span id="api-status-indicator" class="health-status">检测中</span>
@@ -146,6 +154,11 @@
                         <span class="badge">事件类型</span>
                     </div>
                     <div class="manage-grid">
+                        <section class="manage-section" id="admin-section" style="display:none;">
+                            <h3>用户管理</h3>
+                            <p class="manage-hint">管理系统用户和权限。</p>
+                            <a href="admin.html" class="btn-primary manage-submit" style="text-decoration:none; display:inline-block; text-align:center;">进入用户管理</a>
+                        </section>
                         <section class="manage-section">
                             <h3>已创建类型</h3>
                             <p class="manage-hint">在这里查看或删除事件类型，保持分类清晰。</p>
@@ -173,5 +186,23 @@
     <script src="js/event-manager.js"></script>
     <script src="js/main.js"></script>
     <script src="js/calendar.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const user = getUser();
+            if (user) {
+                document.getElementById('user-display-name').textContent = user.username;
+                
+                if (user.is_admin) {
+                    const adminSection = document.getElementById('admin-section');
+                    if (adminSection) adminSection.style.display = 'block';
+                } else {
+                    // Hide Manage Tab for non-admins if required by "普通用户无权查看管理"
+                    // If "管理" means the whole tab:
+                    const manageBtn = document.getElementById('nav-manage');
+                    if (manageBtn) manageBtn.style.display = 'none';
+                }
+            }
+        });
+    </script>
 </body>
 </html>

@@ -9,6 +9,7 @@ from . import event  # noqa: F401, 导入以注册模型到元数据
 from . import idea  # noqa: F401, 导入以注册模型到元数据
 from . import event_type  # noqa: F401, 导入以注册模型到元数据
 from . import daily_score  # noqa: F401, 导入以注册模型到元数据
+from . import user  # noqa: F401, 导入以注册模型到元数据
 
 # 自动加载仓库根目录下的 .env 配置
 load_dotenv(find_dotenv(filename=".env", raise_error_if_not_found=False))
@@ -37,7 +38,24 @@ def init_db() -> None:
     """Create tables for all SQLAlchemy models defined in the project."""
     Base.metadata.create_all(bind=engine)
     _ensure_event_table_columns()
+    _ensure_user_id_columns()
 
+
+def _ensure_user_id_columns() -> None:
+    """Add user_id column to tables if missing."""
+    inspector = inspect(engine)
+    tables = ['events', 'ideas', 'daily_scores', 'event_types']
+    
+    with engine.begin() as connection:
+        for table in tables:
+            if table not in inspector.get_table_names():
+                continue
+                
+            existing_columns = {column['name'] for column in inspector.get_columns(table)}
+            if 'user_id' not in existing_columns:
+                connection.execute(text(f"ALTER TABLE {table} ADD COLUMN user_id INT NULL"))
+                connection.execute(text(f"ALTER TABLE {table} ADD CONSTRAINT fk_{table}_user FOREIGN KEY (user_id) REFERENCES users(id)"))
+                # Data migration will be handled in seed_demo_data after admin user is ensured
 
 def _ensure_event_table_columns() -> None:
     """Add newly introduced columns on existing databases without manual migrations."""

@@ -114,20 +114,22 @@ def calculate_event_score(event: Event) -> int:
     return 0
 
 
-def recalculate_daily_score_for_date(session, target_date: date) -> DailyScore:
+def recalculate_daily_score_for_date(session, target_date: date, user_id: int) -> DailyScore:
     """重新计算指定日期的积分总和"""
-    daily_score = session.query(DailyScore).filter(DailyScore.date == target_date).first()
+    daily_score = session.query(DailyScore).filter(DailyScore.date == target_date, DailyScore.user_id == user_id).first()
     if not daily_score:
         daily_score = DailyScore(
             id=uuid4().hex,
             date=target_date,
-            total_score=0
+            total_score=0,
+            user_id=user_id
         )
         session.add(daily_score)
 
     from sqlalchemy import and_  # 延迟导入避免循环
     completed_events = session.query(Event).filter(
         and_(
+            Event.user_id == user_id,
             Event.is_completed == True,
             Event.start >= datetime.combine(target_date, datetime.min.time()),
             Event.start < datetime.combine(target_date + timedelta(days=1), datetime.min.time())
@@ -139,8 +141,8 @@ def recalculate_daily_score_for_date(session, target_date: date) -> DailyScore:
     return daily_score
 
 
-def calculate_and_update_daily_score(session, event: Event):
+def calculate_and_update_daily_score(session, event: Event, user_id: int):
     """根据事件日期更新每日积分"""
     if not event or not event.start:
         return None
-    return recalculate_daily_score_for_date(session, event.start.date())
+    return recalculate_daily_score_for_date(session, event.start.date(), user_id)
