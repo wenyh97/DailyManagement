@@ -9,6 +9,9 @@ RUN pip install --no-cache-dir -r requirements.txt
 # 再复制后端代码到固定路径，避免包结构被打平
 COPY backend ./backend
 
+# 设置 Python 模块搜索路径，确保可通过 backend.* 导入
+ENV PYTHONPATH=/app
+
 # 切换到 backend 目录以保持相对导入
 WORKDIR /app/backend
 
