@@ -2,9 +2,27 @@ version: '3.8'
 
 services:
   backend:
-    image: tonydmacr.azurecr.io/dailymanagement-image:latest  # 替换为你的实际镜像名
+    image: tonydmacr.azurecr.io/dailymanagement-image:latest
     container_name: backend
     ports:
       - "5000:5000"
     environment:
-      - DATABASE_URL=${DATABASE_URL}  # 使用环境变量注入数据库连接字符串
+      MYSQL_HOST: mysql-server
+      MYSQL_PORT: "3306"
+      MYSQL_USER: ${MYSQL_USER:-root}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-password}
+      MYSQL_DB: ${MYSQL_DB:-daily_management}
+    depends_on:
+      - mysql-server
+
+  mysql-server:
+    image: mysql:latest
+    container_name: mysql-server
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_PASSWORD:-password}
+      MYSQL_DATABASE: ${MYSQL_DB:-daily_management}
+      MYSQL_USER: ${MYSQL_USER:-app_user}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-password}
+    ports:
+      - "3306:3306"
