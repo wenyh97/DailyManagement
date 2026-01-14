@@ -69,23 +69,25 @@ jobs:
           username: ${{ env.SERVER_USER }}
           password: ${{ secrets.SERVER_PASSWORD }}
           script: |
-            # 移动上传的文件到对应目录
-            mv ${{ env.SERVER_BASE_PATH }}/deploy-temp/docker-compose.yml ${{ env.SERVER_BASE_PATH }}/docker-compose/docker-compose.yml
-            mv ${{ env.SERVER_BASE_PATH }}/deploy-temp/nginx.conf ${{ env.SERVER_BASE_PATH }}/nginx/nginx.conf
-            cp -r ${{ env.SERVER_BASE_PATH }}/deploy-temp/frontend/* ${{ env.SERVER_BASE_PATH }}/frontend/
-            # 拉取最新镜像
-            docker pull ${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_IMAGE_NAME }}:latest
-            # 进入 compose 目录并重启服务
-            cd ${{ env.SERVER_BASE_PATH }}/docker-compose
-            docker-compose down
-            docker-compose up -d
-            # 配置 Nginx 作为反向代理
-            docker pull nginx:latest
-            docker rm -f nginx-proxy || true
-            docker run -d --name nginx-proxy \
-              -p 80:80 \
-              -v ${{ env.SERVER_BASE_PATH }}/nginx/nginx.conf:/etc/nginx/nginx.conf:ro \
-              -v ${{ env.SERVER_BASE_PATH }}/frontend:/usr/share/nginx/html:ro \
-              --network host nginx
-            # 清理临时目录
-            rm -rf ${{ env.SERVER_BASE_PATH }}/deploy-temp
+            set -euo pipefail
+            BASE="${{ env.SERVER_BASE_PATH }}"
+            mkdir -p "$BASE/deploy-temp" "$BASE/docker-compose" "$BASE/nginx" "$BASE/frontend"
+            mv "$BASE/deploy-temp/docker-compose.yml" "$BASE/docker-compose/docker-compose.yml"
+            mv "$BASE/deploy-temp/nginx.conf" "$BASE/nginx/nginx.conf"
+            cp -r "$BASE/deploy-temp/frontend/." "$BASE/frontend/"
+            rm -rf "$BASE/deploy-temp"
+            sudo systemctl stop nginx || true
+            sudo docker pull ${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_IMAGE_NAME }}:latest
+            if docker compose version >/dev/null 2>&1; then
+              sudo docker compose -f "$BASE/docker-compose/docker-compose.yml" pull
+              sudo docker compose -f "$BASE/docker-compose/docker-compose.yml" up -d --remove-orphans
+            else
+              sudo docker-compose -f "$BASE/docker-compose/docker-compose.yml" pull
+              sudo docker-compose -f "$BASE/docker-compose/docker-compose.yml" up -d --remove-orphans
+            fi
+            sudo docker pull nginx:1.25-alpine
+            sudo docker rm -f nginx-proxy || true
+            sudo docker run -d --name nginx-proxy --network host \
+              -v "$BASE/nginx/nginx.conf:/etc/nginx/nginx.conf:ro" \
+              -v "$BASE/frontend:/usr/share/nginx/html:ro" \
+              nginx:1.25-alpine

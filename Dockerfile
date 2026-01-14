@@ -1,17 +1,16 @@
 # 使用官方 Python 基础镜像
 FROM python:3.10-slim
 
-# 设置工作目录
+# 先复制依赖并安装
 WORKDIR /app
-
-# 复制依赖文件
-COPY backend/requirements.txt ./
-
-# 安装依赖
+COPY backend/requirements.txt ./requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt
 
-# 复制后端代码
-COPY backend/ ./
+# 再复制后端代码到固定路径，避免包结构被打平
+COPY backend ./backend
+
+# 切换到 backend 目录以保持相对导入
+WORKDIR /app/backend
 
 # 暴露端口
 EXPOSE 5000
