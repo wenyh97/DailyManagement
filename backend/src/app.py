@@ -1,6 +1,7 @@
 from datetime import datetime, timedelta  # 引入 datetime 用于生成时间戳
 from typing import Dict, List  # 引入类型注解确保数据结构清晰
 from uuid import uuid4  # 引入 uuid4 用于生成唯一标识符
+import os
 
 from flask import Flask, jsonify, request  # 引入 Flask 核心类以及 JSON 工具
 
@@ -23,6 +24,7 @@ from .services.event_service import (
     recalculate_daily_score_for_date,
     calculate_event_score
 )
+from .services import plan_service
 
 # 统计数据缓存
 stats_cache = {
@@ -63,7 +65,12 @@ def create_app() -> Flask:  # 创建并配置 Flask 应用的工厂函数
         logging.error(f"Expired Token: {jwt_payload}")
         return jsonify({"error": "Token has expired", "token_expired": True}), 401
 
-    CORS(app)
+    # 配置CORS，支持所有方法包括OPTIONS
+    CORS(app, 
+         resources={r"/*": {"origins": "*"}},
+         methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+         allow_headers=["Content-Type", "Authorization"])
+    
     register_routes(app)
     init_db()
     seed_demo_data()
@@ -499,6 +506,107 @@ def register_routes(app: Flask) -> None:  # 定义路由注册函数以保持结
             return jsonify(event_to_dict(event)), 200
         finally:
             session.close()
+
+    @app.route("/api/plans", methods=["GET", "OPTIONS"])
+    def list_plans_api():
+        if request.method == "OPTIONS":
+            return "", 204
+        # JWT验证只对非OPTIONS请求生效
+        from flask_jwt_extended import verify_jwt_in_request
+        verify_jwt_in_request()
+        current_user_id = int(get_jwt_identity())
+        try:
+            payload = plan_service.list_plans(current_user_id)
+            return jsonify(payload), 200
+        except plan_service.PlanServiceError as exc:
+            logging.error("List plans failed: %s", exc)
+            return jsonify({"error": str(exc)}), 400
+
+    @app.route("/api/plans", methods=["POST", "OPTIONS"])
+    def create_plan_api():
+        if request.method == "OPTIONS":
+            return "", 204
+        # JWT验证只对非OPTIONS请求生效
+        from flask_jwt_extended import verify_jwt_in_request
+        verify_jwt_in_request()
+        current_user_id = int(get_jwt_identity())
+        data = request.get_json(force=True) or {}
+        try:
+            payload = plan_service.create_plan(current_user_id, data)
+            return jsonify(payload), 201
+        except plan_service.ScoreBudgetExceeded as exc:
+            return jsonify({"error": str(exc), "remaining_score": exc.remaining_score}), 409
+        except plan_service.PlanValidationError as exc:
+            return jsonify({"error": str(exc)}), 400
+        except plan_service.PlanServiceError as exc:
+            logging.error("Create plan failed: %s", exc)
+            return jsonify({"error": str(exc)}), 400
+
+    @app.route("/api/plans/<plan_id>", methods=["PUT", "OPTIONS"])
+    def update_plan_api(plan_id: str):
+        if request.method == "OPTIONS":
+            return "", 204
+        # JWT验证只对非OPTIONS请求生效
+        from flask_jwt_extended import verify_jwt_in_request
+        verify_jwt_in_request()
+        current_user_id = int(get_jwt_identity())
+        data = request.get_json(force=True) or {}
+        try:
+            logging.info(f"Update plan {plan_id} - payload: {data}")
+            payload = plan_service.update_plan(current_user_id, plan_id, data)
+            return jsonify(payload), 200
+        except plan_service.ScoreBudgetExceeded as exc:
+            logging.error(f"Update plan {plan_id} - ScoreBudgetExceeded: {exc}")
+            return jsonify({"error": str(exc), "remaining_score": exc.remaining_score}), 409
+        except plan_service.PlanNotFoundError as exc:
+            logging.error(f"Update plan {plan_id} - PlanNotFoundError: {exc}")
+            return jsonify({"error": str(exc)}), 404
+        except plan_service.PlanValidationError as exc:
+            logging.error(f"Update plan {plan_id} - PlanValidationError: {exc}")
+            return jsonify({"error": str(exc)}), 400
+        except plan_service.PlanServiceError as exc:
+            logging.error(f"Update plan {plan_id} - PlanServiceError: {exc}")
+            return jsonify({"error": str(exc)}), 400
+        except Exception as exc:
+            logging.exception(f"Update plan {plan_id} - Unexpected error: {exc}")
+            return jsonify({"error": "服务器内部错误"}), 500
+
+    @app.route("/api/plans/<plan_id>/goal-order", methods=["PATCH", "OPTIONS"])
+    def reorder_plan_goals_api(plan_id: str):
+        if request.method == "OPTIONS":
+            return "", 204
+        # JWT验证只对非OPTIONS请求生效
+        from flask_jwt_extended import verify_jwt_in_request
+        verify_jwt_in_request()
+        current_user_id = int(get_jwt_identity())
+        data = request.get_json(force=True) or {}
+        try:
+            payload = plan_service.reorder_plan_goals(current_user_id, plan_id, data.get("goal_ids"))
+            return jsonify(payload), 200
+        except plan_service.PlanNotFoundError as exc:
+            return jsonify({"error": str(exc)}), 404
+        except plan_service.PlanValidationError as exc:
+            return jsonify({"error": str(exc)}), 400
+        except plan_service.PlanServiceError as exc:
+            logging.error("Reorder plan goals failed: %s", exc)
+            return jsonify({"error": str(exc)}), 400
+
+    @app.route("/api/plans/<plan_id>", methods=["DELETE", "OPTIONS"])
+    def delete_plan_api(plan_id: str):
+        if request.method == "OPTIONS":
+            return "", 204
+        # JWT验证只对非OPTIONS请求生效
+        from flask_jwt_extended import verify_jwt_in_request
+        verify_jwt_in_request()
+        current_user_id = int(get_jwt_identity())
+        try:
+            payload = plan_service.delete_plan(current_user_id, plan_id)
+            return jsonify(payload), 200
+        except plan_service.PlanNotFoundError as exc:
+            return jsonify({"error": str(exc)}), 404
+        except plan_service.PlanServiceError as exc:
+            logging.error("Delete plan failed: %s", exc)
+            return jsonify({"error": str(exc)}), 400
 
     @app.route("/ideas", methods=["GET"])
     @jwt_required()
@@ -977,6 +1085,86 @@ def seed_demo_data() -> None:  # 定义示例数据填充函数
                 except Exception as e:
                     logging.warning(f"Migration for table {table} failed (maybe column missing?): {e}")
             session.commit()
+
+            # Optional annual planning demo data (requires new tables/migrations)
+            seed_planning_demo = os.getenv("SEED_PLANNING_DEMO", "0").lower() in {"1", "true", "yes"}
+            if seed_planning_demo:
+                try:
+                    session.execute(text("SELECT 1 FROM annual_plans LIMIT 1"))
+                except Exception as exc:
+                    logging.info("Skipping planning demo seed (tables missing yet): %s", exc)
+                else:
+                    existing = session.execute(
+                        text("SELECT COUNT(*) FROM annual_plans WHERE user_id = :uid"), {"uid": admin.id}
+                    ).scalar_one()
+                    if existing == 0:
+                        now = datetime.utcnow()
+                        plan_id = uuid4().hex
+                        session.execute(
+                            text(
+                                """
+                                INSERT INTO annual_plans (id, user_id, title, description, score_allocation, status, created_at, updated_at)
+                                VALUES (:id, :uid, :title, :description, :score, :status, :created_at, :updated_at)
+                                """
+                            ),
+                            {
+                                "id": plan_id,
+                                "uid": admin.id,
+                                "title": "年度成长规划",
+                                "description": "围绕健康、学习、家庭三条主线分配 100 分",
+                                "score": 60,
+                                "status": "active",
+                                "created_at": now,
+                                "updated_at": now,
+                            }
+                        )
+
+                        goal_rows = [
+                            {
+                                "id": uuid4().hex,
+                                "plan_id": plan_id,
+                                "name": "完成 6 本专业书",
+                                "details": "每两个月安排一次输出总结",
+                                "expected_timeframe": "Q1-Q3",
+                                "status": "pending",
+                            },
+                            {
+                                "id": uuid4().hex,
+                                "plan_id": plan_id,
+                                "name": "坚持周跑 20 公里",
+                                "details": "拆分为 4 次 5 公里，记录配速",
+                                "expected_timeframe": "全年",
+                                "status": "pending",
+                            },
+                            {
+                                "id": uuid4().hex,
+                                "plan_id": plan_id,
+                                "name": "每月一次家庭日",
+                                "details": "固定在每月第三个周六，记录合照",
+                                "expected_timeframe": "每月",
+                                "status": "pending",
+                            },
+                        ]
+
+                        for goal in goal_rows:
+                            session.execute(
+                                text(
+                                    """
+                                    INSERT INTO plan_goals (id, plan_id, name, details, expected_timeframe, status, created_at, updated_at)
+                                    VALUES (:id, :plan_id, :name, :details, :expected_timeframe, :status, :created_at, :updated_at)
+                                    """
+                                ),
+                                {
+                                    **goal,
+                                    "created_at": now,
+                                    "updated_at": now,
+                                }
+                            )
+
+                        session.commit()
+                        logging.info("Seeded demo annual plan data for admin user")
+                    else:
+                        logging.info("Annual plan data already present, skipping demo seed")
             
     except Exception as e:
         logging.error(f"Seeding/Migration failed: {e}")

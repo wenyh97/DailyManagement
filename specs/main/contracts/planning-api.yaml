@@ -1,0 +1,205 @@
+openapi: 3.0.3
+info:
+  title: Annual Planning API
+  version: 0.1.0
+  description: REST contracts for annual plan + goal execution workflows.
+servers:
+  - url: https://api.example.com
+paths:
+  /api/plans:
+    get:
+      summary: List plans with nested goals and score budget
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Plans for the authenticated user
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  remaining_score:
+                    type: integer
+                    minimum: 0
+                    maximum: 100
+                  plans:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/AnnualPlan'
+    post:
+      summary: Create a plan (optionally with goals)
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PlanUpsertRequest'
+      responses:
+        '201':
+          description: Plan created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AnnualPlan'
+        '409':
+          description: Score cap exceeded
+  /api/plans/{planId}:
+    patch:
+      summary: Update plan metadata or replace goals collection
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: planId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PlanUpsertRequest'
+      responses:
+        '200':
+          description: Updated plan
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AnnualPlan'
+        '404':
+          description: Plan not found
+        '409':
+          description: Score cap exceeded
+  /api/plans/{planId}/goals:
+    post:
+      summary: Append additional goals to an existing plan
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: planId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                goals:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/PlanGoalInput'
+      responses:
+        '201':
+          description: Goals appended
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AnnualPlan'
+  /api/plan-goals/{goalId}/status:
+    patch:
+      summary: Transition a goal via the "执行" action
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: goalId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                status:
+                  type: string
+                  enum: [executing, done]
+      responses:
+        '200':
+          description: Updated goal status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PlanGoal'
+        '404':
+          description: Goal not found
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    AnnualPlan:
+      type: object
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        description:
+          type: string
+          nullable: true
+        score_allocation:
+          type: integer
+        status:
+          type: string
+          enum: [draft, active, archived]
+        remaining_score_hint:
+          type: integer
+        goals:
+          type: array
+          items:
+            $ref: '#/components/schemas/PlanGoal'
+    PlanGoal:
+      type: object
+      properties:
+        id:
+          type: string
+        plan_id:
+          type: string
+        name:
+          type: string
+        details:
+          type: string
+        expected_timeframe:
+          type: string
+        status:
+          type: string
+          enum: [pending, executing, done]
+    PlanGoalInput:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+        details:
+          type: string
+        expected_timeframe:
+          type: string
+    PlanUpsertRequest:
+      type: object
+      required: [title, score_allocation]
+      properties:
+        title:
+          type: string
+        description:
+          type: string
+        score_allocation:
+          type: integer
+          minimum: 0
+          maximum: 100
+        goals:
+          type: array
+          items:
+            $ref: '#/components/schemas/PlanGoalInput'

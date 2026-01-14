@@ -11,9 +11,210 @@ document.addEventListener('DOMContentLoaded', () => { // 监听页面加载完�
     const manageTypeNameInput = document.getElementById('manage-type-name'); // 类型名称输入框
     const manageTypeColorInput = document.getElementById('manage-type-color'); // 类型颜色选择器
     const manageTypeColorPreview = document.getElementById('manage-type-color-preview'); // 类型颜色预览
+    const planningTabButtons = document.querySelectorAll('.planning-tab-btn');
+    const planningTabPanels = document.querySelectorAll('.planning-tab-panel');
+    const planAccordion = document.getElementById('plan-accordion');
+    const planningLoadingEl = document.getElementById('planning-loading');
+    const goalExecutionList = document.getElementById('goal-execution-list');
+    const openPlanModalButton = document.getElementById('open-plan-modal');
+    const planModalElement = document.getElementById('plan-modal');
+    const planModalCloseButton = document.getElementById('plan-modal-close');
+    const planModalCancelButton = document.getElementById('plan-modal-cancel');
+    const planForm = document.getElementById('plan-form');
+    const planTitleInput = document.getElementById('plan-title');
+    const planDescriptionInput = document.getElementById('plan-description');
+    const planYearSelect = document.getElementById('plan-year');
+    const planModalRemaining = document.getElementById('plan-modal-remaining');
+    const planTotalValueEl = document.getElementById('plan-total-value');
+    const planModalError = document.getElementById('plan-modal-error');
+    const planGoalsContainer = document.getElementById('plan-goals-container');
+    const addGoalRowButton = document.getElementById('add-goal-row');
+    const planGoalTemplate = document.getElementById('plan-goal-row-template');
+    const planSubmitButton = document.getElementById('plan-submit-button');
+    const planModalContent = planModalElement ? planModalElement.querySelector('.plan-modal-content') : null;
+    const planModalTitleEl = document.getElementById('plan-modal-title');
+    const planModalDescriptionEl = document.getElementById('plan-modal-description');
+    const defaultPlanModalTitle = planModalTitleEl ? planModalTitleEl.textContent : '添加年度规划';
+    const defaultPlanModalDescription = planModalDescriptionEl ? planModalDescriptionEl.textContent : '';
     let ideasCache = []; // 定义灵感缓存数组便于后续查找
+    let planDataCache = []; // 年度规划缓存
+    let currentRemainingScore = 100;
+    let editingPlanId = null;
+    let editingPlanOriginalScore = 0;
     let convertIdeaContext = null; // 定义当前正在转换的灵感上下文
     let editingTypeId = null; // 当前正在编辑的类型ID
+    let planningDataLoaded = false;
+    const defaultPlanYear = new Date().getFullYear();
+
+    const buildPlanYearOptions = (focusYear = defaultPlanYear) => {
+        if (!planYearSelect) return;
+        const now = new Date().getFullYear();
+        const normalizedFocus = Number.isFinite(focusYear) ? focusYear : defaultPlanYear;
+        const startYear = Math.min(normalizedFocus - 1, now - 1);
+        const endYear = Math.max(normalizedFocus + 5, now + 5);
+        const options = ['<option value="">请选择年份</option>'];
+        for (let year = startYear; year <= endYear; year += 1) {
+            options.push(`<option value="${year}">${year} 年</option>`);
+        }
+        planYearSelect.innerHTML = options.join('');
+    };
+
+    const setPlanModalYear = (year = defaultPlanYear) => {
+        if (!planYearSelect) return;
+        buildPlanYearOptions(year);
+        const normalized = Number.isFinite(year) ? year : defaultPlanYear;
+        planYearSelect.value = String(normalized);
+    };
+
+    const getPlanModalYearValue = () => {
+        if (!planYearSelect) return null;
+        const parsed = parseInt(planYearSelect.value, 10);
+        if (!Number.isNaN(parsed)) {
+            return parsed;
+        }
+        return null;
+    };
+
+    if (planYearSelect) {
+        setPlanModalYear(defaultPlanYear);
+    }
+
+    const EXECUTION_QUEUE_STORAGE_KEY = 'dailyManagement.goalExecutionQueue';
+
+    const queueKey = (planId, goalId) => `${planId || ''}::${goalId || ''}`;
+
+    const loadExecutionQueue = () => {
+        if (typeof localStorage === 'undefined') {
+            return [];
+        }
+        try {
+            const stored = localStorage.getItem(EXECUTION_QUEUE_STORAGE_KEY);
+            if (!stored) return [];
+            const parsed = JSON.parse(stored);
+            if (!Array.isArray(parsed)) {
+                return [];
+            }
+            return parsed
+                .map((entry) => ({ planId: entry.planId, goalId: entry.goalId }))
+                .filter((entry) => entry.planId && entry.goalId);
+        } catch (error) {
+            console.warn('[Planning] Failed to parse execution queue from storage:', error);
+            return [];
+        }
+    };
+
+    const persistExecutionQueue = (nextQueue) => {
+        goalExecutionQueue = nextQueue;
+        goalExecutionQueueSet = new Set(nextQueue.map((entry) => queueKey(entry.planId, entry.goalId)));
+        if (typeof localStorage === 'undefined') {
+            return;
+        }
+        try {
+            localStorage.setItem(EXECUTION_QUEUE_STORAGE_KEY, JSON.stringify(nextQueue));
+        } catch (error) {
+            console.warn('[Planning] Failed to persist execution queue:', error);
+        }
+    };
+
+    let goalExecutionQueue = loadExecutionQueue();
+    let goalExecutionQueueSet = new Set(goalExecutionQueue.map((entry) => queueKey(entry.planId, entry.goalId)));
+
+    const isGoalQueued = (planId, goalId) => goalExecutionQueueSet.has(queueKey(planId, goalId));
+
+    const pruneExecutionQueue = (validEntries) => {
+        if (validEntries.length === goalExecutionQueue.length) {
+            return;
+        }
+        persistExecutionQueue(validEntries);
+    };
+
+    const addGoalToExecutionQueue = (planId, goalId) => {
+        if (!planId || !goalId) return false;
+        if (isGoalQueued(planId, goalId)) return false;
+        const nextQueue = [...goalExecutionQueue, { planId, goalId }];
+        persistExecutionQueue(nextQueue);
+        renderPlanAccordion(planDataCache);
+        renderGoalExecutionBoard(planDataCache);
+        return true;
+    };
+
+    const removeGoalFromExecutionQueue = (planId, goalId) => {
+        if (!planId || !goalId) return false;
+        if (!isGoalQueued(planId, goalId)) return false;
+        const nextQueue = goalExecutionQueue.filter((entry) => entry.planId !== planId || entry.goalId !== goalId);
+        persistExecutionQueue(nextQueue);
+        renderPlanAccordion(planDataCache);
+        renderGoalExecutionBoard(planDataCache);
+        return true;
+    };
+
+    const TASK_STATUS_STORAGE_KEY = 'dailyManagement.goalTaskStatuses';
+    const allowedTaskStatuses = ['backlog', 'todo', 'doing', 'done'];
+
+    const normalizeTaskStatus = (value) => (allowedTaskStatuses.includes(value) ? value : 'backlog');
+
+    const taskKey = (planId, goalId, taskId) => `${planId || ''}::${goalId || ''}::${taskId || ''}`;
+
+    const loadTaskStatusMap = () => {
+        if (typeof localStorage === 'undefined') {
+            return {};
+        }
+        try {
+            const stored = localStorage.getItem(TASK_STATUS_STORAGE_KEY);
+            if (!stored) return {};
+            const parsed = JSON.parse(stored);
+            return typeof parsed === 'object' && parsed !== null ? parsed : {};
+        } catch (error) {
+            console.warn('[Planning] Failed to parse task-status cache:', error);
+            return {};
+        }
+    };
+
+    const persistTaskStatusMap = () => {
+        if (typeof localStorage === 'undefined') {
+            return;
+        }
+        try {
+            localStorage.setItem(TASK_STATUS_STORAGE_KEY, JSON.stringify(goalTaskStatusMap));
+        } catch (error) {
+            console.warn('[Planning] Failed to persist task-status cache:', error);
+        }
+    };
+
+    let goalTaskStatusMap = loadTaskStatusMap();
+
+    const getTaskStatus = (planId, goalId, taskId) => normalizeTaskStatus(goalTaskStatusMap[taskKey(planId, goalId, taskId)]);
+
+    const setTaskStatus = (planId, goalId, taskId, status) => {
+        if (!planId || !goalId || !taskId) return false;
+        const normalizedStatus = normalizeTaskStatus(status);
+        const key = taskKey(planId, goalId, taskId);
+        const previous = normalizeTaskStatus(goalTaskStatusMap[key]);
+        if (previous === normalizedStatus) {
+            return false;
+        }
+        goalTaskStatusMap[key] = normalizedStatus;
+        persistTaskStatusMap();
+        
+        // 更新目标和规划的状态
+        updateGoalAndPlanStatus(planId, goalId);
+        
+        renderGoalExecutionBoard(planDataCache);
+        return true;
+    };
+
+    const pruneTaskStatusMap = (validKeys) => {
+        let mutated = false;
+        Object.keys(goalTaskStatusMap).forEach((key) => {
+            if (!validKeys.has(key)) {
+                delete goalTaskStatusMap[key];
+                mutated = true;
+            }
+        });
+        if (mutated) {
+            persistTaskStatusMap();
+        }
+    };
 
     const convertModalWrapper = document.createElement('div'); // 创建转换弹窗包裹元素
     convertModalWrapper.innerHTML = `
@@ -127,6 +328,8 @@ document.addEventListener('DOMContentLoaded', () => { // 监听页面加载完�
         duplicateItemsAllowed: false
     }; // 定义通用配置
 
+    const hasPlansApi = typeof window.plansApi !== 'undefined';
+
     if (window.flatpickr) { // 确认 flatpickr 是否已加载
         if (flatpickr.l10ns && flatpickr.l10ns.zh) { // 统一使用中文本地化
             flatpickr.localize(flatpickr.l10ns.zh);
@@ -182,6 +385,1449 @@ document.addEventListener('DOMContentLoaded', () => { // 监听页面加载完�
             apiStatusIndicator.className = 'health-status offline'; // 添加离线样式
         } // try-catch 结构结束
     }; // 函数定义结束
+
+    const planStatusLabels = {
+        pending: '待开始',
+        executing: '进行中',
+        done: '已完成',
+        draft: '草稿',
+        active: '进行中',
+        archived: '已归档'
+    };
+
+    const goalStatusLabels = {
+        pending: '待开始',
+        executing: '进行中',
+        done: '已完成'
+    };
+
+    const toSafeNumber = (value, fallback = null) => {
+        const parsed = Number(value);
+        return Number.isFinite(parsed) ? parsed : fallback;
+    };
+
+    const isPlanEditing = () => Boolean(editingPlanId);
+
+    const getPlanModalCapacity = () => {
+        const extra = isPlanEditing() ? editingPlanOriginalScore : 0;
+        return Math.max(0, currentRemainingScore + extra);
+    };
+
+    const getPlanSubmitIdleText = () => (isPlanEditing() ? '保存修改' : '保存规划');
+
+    const getGoalRows = () => {
+        if (!planGoalsContainer) return [];
+        return Array.from(planGoalsContainer.querySelectorAll('[data-goal-row]'));
+    };
+
+    const getGoalScoresTotal = () => {
+        return getGoalRows().reduce((sum, row) => {
+            const scoreInput = row.querySelector('.goal-score');
+            const value = parseInt(scoreInput?.value, 10);
+            return sum + (Number.isFinite(value) ? value : 0);
+        }, 0);
+    };
+
+    const updatePlanTotalValue = (totalScore = 0) => {
+        if (!planTotalValueEl) return;
+        const safeValue = Math.max(0, Math.round(Number(totalScore) || 0));
+        planTotalValueEl.textContent = `${safeValue} 分`;
+        const overBudget = safeValue > getPlanModalCapacity();
+        planTotalValueEl.classList.toggle('warn', overBudget);
+    };
+
+    const setPlanModalMode = (mode = 'create', planTitle = '') => {
+        const isEditingMode = mode === 'edit';
+        if (planModalTitleEl) {
+            planModalTitleEl.textContent = isEditingMode ? '编辑年度规划' : defaultPlanModalTitle;
+        }
+        if (planModalDescriptionEl) {
+            if (isEditingMode) {
+                const safeTitle = (planTitle || '').trim();
+                planModalDescriptionEl.textContent = safeTitle
+                    ? `正在调整「${safeTitle}」，请保持 100 分预算合理分配。`
+                    : '调整当前规划，保持 100 分预算合理分配。';
+            } else {
+                planModalDescriptionEl.textContent = defaultPlanModalDescription;
+            }
+        }
+        if (planSubmitButton && planSubmitButton.dataset.loading !== 'true') {
+            planSubmitButton.textContent = getPlanSubmitIdleText();
+        }
+    };
+
+    const resetPlanModalState = () => {
+        editingPlanId = null;
+        editingPlanOriginalScore = 0;
+        setPlanModalMode('create');
+        updatePlanTotalValue(0);
+    };
+
+    const updatePlanModalRemainingDisplay = (currentTotal = 0) => {
+        if (!planModalRemaining) return;
+        const capacity = getPlanModalCapacity();
+        const normalized = Number.isFinite(currentTotal) ? Math.max(0, Math.round(currentTotal)) : 0;
+        if (capacity <= 0) {
+            planModalRemaining.textContent = isPlanEditing() ? '该规划暂无可用积分' : '暂无可用积分';
+            planModalRemaining.classList.add('warn');
+            return;
+        }
+        const remainingAfter = capacity - normalized;
+        if (remainingAfter < 0) {
+            const prefixOver = isPlanEditing() ? '可用' : '剩余';
+            planModalRemaining.textContent = `${prefixOver} ${capacity} 分，已超出 ${Math.abs(remainingAfter)} 分`;
+            planModalRemaining.classList.add('warn');
+            return;
+        }
+        const prefix = isPlanEditing() ? '可用' : '剩余';
+        const suffix = normalized > 0 ? `→ 保存后 ${remainingAfter} 分` : '';
+        planModalRemaining.textContent = `${prefix} ${capacity} 分 ${suffix}`.trim();
+        planModalRemaining.classList.toggle('warn', normalized > 0 && remainingAfter === 0);
+    };
+
+    const refreshPlanScoreSummary = () => {
+        const total = getGoalScoresTotal();
+        updatePlanTotalValue(total);
+        updatePlanModalRemainingDisplay(total);
+    };
+
+    const updatePlanCreateAvailability = () => {
+        const apiUnavailable = !hasPlansApi;
+        const noScoreLeft = currentRemainingScore <= 0;
+        if (openPlanModalButton) {
+            openPlanModalButton.disabled = apiUnavailable || noScoreLeft;
+            if (apiUnavailable) {
+                openPlanModalButton.textContent = '功能不可用';
+                openPlanModalButton.title = '未加载年度规划 API';
+            } else if (noScoreLeft) {
+                openPlanModalButton.textContent = '积分已用完';
+                openPlanModalButton.title = '100 分预算已用完';
+            } else {
+                openPlanModalButton.textContent = '+ 添加规划';
+                openPlanModalButton.title = '';
+            }
+        }
+        const formDisabled = apiUnavailable || (noScoreLeft && !isPlanEditing());
+        const capacity = getPlanModalCapacity();
+        if (planSubmitButton && planSubmitButton.dataset.loading !== 'true') {
+            planSubmitButton.disabled = formDisabled;
+        }
+        if (addGoalRowButton) {
+            addGoalRowButton.disabled = formDisabled;
+        }
+    };
+
+    const setRemainingScore = (value = 100) => {
+        const parsed = toSafeNumber(value, 100);
+        const safeValue = Math.max(0, Math.round(parsed));
+        currentRemainingScore = safeValue;
+        refreshPlanScoreSummary();
+        updatePlanCreateAvailability();
+    };
+    updatePlanCreateAvailability();
+
+    const setPlanningLoading = (isLoading) => {
+        if (!planningLoadingEl) return;
+        planningLoadingEl.classList.toggle('hidden', !isLoading);
+    };
+
+    const attachPlanToggleHandlers = () => {
+        if (!planAccordion) return;
+        const toggles = planAccordion.querySelectorAll('.plan-toggle');
+        toggles.forEach((toggle) => {
+            toggle.addEventListener('click', () => {
+                const parent = toggle.closest('.plan-item');
+                if (!parent) return;
+                const expanded = parent.getAttribute('data-expanded') === 'true';
+                parent.setAttribute('data-expanded', (!expanded).toString());
+                toggle.setAttribute('aria-expanded', (!expanded).toString());
+            });
+        });
+    };
+
+    const persistGoalOrder = async (planId, orderedIds) => {
+        if (!hasPlansApi || !planId || !Array.isArray(orderedIds) || !orderedIds.length) {
+            return;
+        }
+        try {
+            const payload = await window.plansApi.reorderGoals(planId, orderedIds);
+            if (payload?.plan) {
+                const index = planDataCache.findIndex((plan) => plan.id === planId);
+                if (index >= 0) {
+                    planDataCache.splice(index, 1, payload.plan);
+                } else {
+                    planDataCache = [payload.plan, ...planDataCache];
+                }
+                renderPlanAccordion(planDataCache);
+                renderGoalExecutionBoard(planDataCache);
+            }
+        } catch (error) {
+            console.error('[Planning] Failed to persist goal order', error);
+            loadPlans(true);
+        }
+    };
+
+    let draggedGoalInfo = null;
+
+    const updateGoalOrderCache = (listElement) => {
+        const planId = listElement?.dataset?.planId;
+        if (!planId) return;
+        const plan = findPlanById(planId);
+        if (!plan || !Array.isArray(plan.goals)) return;
+        const orderedIds = Array.from(listElement.querySelectorAll('[data-goal-id]'))
+            .map((node) => node.dataset.goalId)
+            .filter(Boolean);
+        if (!orderedIds.length) return null;
+        const orderMap = new Map();
+        orderedIds.forEach((id, index) => {
+            orderMap.set(String(id), index);
+        });
+        plan.goals.sort((a, b) => {
+            const indexA = orderMap.has(String(a.id)) ? orderMap.get(String(a.id)) : Number.MAX_SAFE_INTEGER;
+            const indexB = orderMap.has(String(b.id)) ? orderMap.get(String(b.id)) : Number.MAX_SAFE_INTEGER;
+            return indexA - indexB;
+        });
+        return orderedIds;
+    };
+
+    const handleGoalDragStart = (event) => {
+        const item = event.currentTarget;
+        const list = item.closest('.plan-goal-list');
+        if (!list) return;
+        draggedGoalInfo = {
+            element: item,
+            planId: list.dataset.planId || null,
+            list
+        };
+        item.classList.add('dragging');
+        if (event.dataTransfer) {
+            event.dataTransfer.effectAllowed = 'move';
+            event.dataTransfer.setData('text/plain', item.dataset.goalId || '');
+        }
+    };
+
+    const handleGoalDragEnd = (event) => {
+        event.currentTarget.classList.remove('dragging');
+        draggedGoalInfo = null;
+    };
+
+    const handleGoalDragOver = (event) => {
+        if (!draggedGoalInfo) return;
+        const list = event.currentTarget;
+        if (list.dataset.planId !== draggedGoalInfo.planId) return;
+        event.preventDefault();
+        event.dataTransfer.dropEffect = 'move';
+        const targetItem = event.target.closest('[data-goal-id]');
+        if (!targetItem) {
+            list.appendChild(draggedGoalInfo.element);
+            return;
+        }
+        if (targetItem === draggedGoalInfo.element) return;
+        const bounding = targetItem.getBoundingClientRect();
+        const shouldInsertBefore = event.clientY < bounding.top + bounding.height / 2;
+        const referenceNode = shouldInsertBefore ? targetItem : targetItem.nextSibling;
+        list.insertBefore(draggedGoalInfo.element, referenceNode);
+    };
+
+    const handleGoalDrop = (event) => {
+        if (!draggedGoalInfo) return;
+        const list = event.currentTarget;
+        if (list.dataset.planId !== draggedGoalInfo.planId) return;
+        event.preventDefault();
+        draggedGoalInfo.element.classList.remove('dragging');
+        const orderedIds = updateGoalOrderCache(list);
+        draggedGoalInfo = null;
+        if (orderedIds && orderedIds.length) {
+            persistGoalOrder(list.dataset.planId, orderedIds);
+        }
+    };
+
+    const enableGoalDragAndDrop = () => {
+        if (!planAccordion) return;
+        const lists = planAccordion.querySelectorAll('.plan-goal-list');
+        lists.forEach((list) => {
+            list.removeEventListener('dragover', handleGoalDragOver);
+            list.removeEventListener('drop', handleGoalDrop);
+            list.addEventListener('dragover', handleGoalDragOver);
+            list.addEventListener('drop', handleGoalDrop);
+            const items = list.querySelectorAll('[data-goal-id]');
+            items.forEach((item) => {
+                item.removeEventListener('dragstart', handleGoalDragStart);
+                item.removeEventListener('dragend', handleGoalDragEnd);
+                item.addEventListener('dragstart', handleGoalDragStart);
+                item.addEventListener('dragend', handleGoalDragEnd);
+            });
+        });
+    };
+
+    let executionTaskRegistry = new Map();
+
+    const registerExecutionTaskMeta = (entries) => {
+        executionTaskRegistry = new Map(
+            entries.map((entry) => [taskKey(entry.planId, entry.goalId, entry.taskId), entry])
+        );
+    };
+
+    const getExecutionTaskMeta = (planId, goalId, taskId) => executionTaskRegistry.get(taskKey(planId, goalId, taskId));
+
+    let draggedTaskCard = null;
+    const expandedGoalCards = new Set(); // 存储展开的目标卡片ID
+
+    const executionColumns = [
+        { key: 'backlog', title: '目标列表', icon: '🗂️' },
+        { key: 'todo', title: '待开始', icon: '🕒' },
+        { key: 'doing', title: '进行中', icon: '⚡' },
+        { key: 'done', title: '已完成', icon: '✅' }
+    ];
+
+    const executionColumnPlaceholders = {
+        backlog: '点击年度规划里的“追踪”按钮，把目标加入执行列表。',
+        todo: '将任务拖到这里，准备启动。',
+        doing: '放入此列并完善事件，日历将同步。',
+        done: '完成的任务拖到这里即可归档。'
+    };
+
+    const extractGoalTasks = (details) => {
+        if (!details) return [];
+        return details
+            .split(/\r?\n+/)
+            .map((line) => line.replace(/^[\s•·\-]+/, '').trim())
+            .filter(Boolean);
+    };
+
+    // 计算目标的状态：根据其任务的状态
+    const calculateGoalStatus = (planId, goalId, goalDetails) => {
+        const tasks = extractGoalTasks(goalDetails);
+        if (!tasks.length) return 'pending';
+        
+        const taskStatuses = tasks.map((task, index) => {
+            const taskId = `${goalId || 'goal'}-${index}`;
+            return getTaskStatus(planId, goalId, taskId);
+        });
+        
+        // 所有任务都完成
+        const allDone = taskStatuses.every(s => s === 'done');
+        if (allDone) return 'done';
+        
+        // 只要有任务在doing状态，就算进行中
+        const anyDoing = taskStatuses.some(s => s === 'doing');
+        if (anyDoing) return 'executing';
+        
+        // 有任务已完成，其余任务待开始或进行中时，状态为进行中
+        const someDone = taskStatuses.some(s => s === 'done');
+        if (someDone) return 'executing';
+        
+        return 'pending';
+    };
+
+    // 计算规划的状态：根据其目标的状态
+    const calculatePlanStatus = (plan) => {
+        if (!plan.goals || !plan.goals.length) return 'pending';
+        
+        const goalStatuses = plan.goals.map(goal => goal.status || 'pending');
+        
+        // 所有目标都完成
+        const allDone = goalStatuses.every(s => s === 'done');
+        if (allDone) return 'done';
+        
+        // 任意一个目标进行中
+        const anyExecuting = goalStatuses.some(s => s === 'executing');
+        if (anyExecuting) return 'executing';
+        
+        // 有目标已完成，其余目标待开始或进行中时，状态为进行中
+        const someDone = goalStatuses.some(s => s === 'done');
+        if (someDone) return 'executing';
+        
+        // 全部是待开始
+        return 'pending';
+    };
+
+    // 将目标状态映射为规划状态(数据库字段不同)
+    const mapGoalStatusToPlanStatus = (goalStatus) => {
+        // 目标状态: pending, executing, done
+        // 规划状态: draft, active, archived
+        switch (goalStatus) {
+            case 'done':
+                return 'archived';  // 全部完成 -> 已归档
+            case 'executing':
+                return 'active';    // 进行中 -> 活跃
+            case 'pending':
+            default:
+                return 'active';    // 待开始但已创建 -> 活跃(不是草稿)
+        }
+    };
+
+    // 更新目标和规划的状态
+    const updateGoalAndPlanStatus = async (planId, goalId) => {
+        const plan = planDataCache.find(p => p.id === planId);
+        if (!plan || !plan.goals) return;
+        
+        const goal = plan.goals.find(g => g.id === goalId);
+        if (!goal) return;
+        
+        // 计算新的目标状态
+        const newGoalStatus = calculateGoalStatus(planId, goalId, goal.details);
+        const goalStatusChanged = goal.status !== newGoalStatus;
+        
+        if (goalStatusChanged) {
+            goal.status = newGoalStatus;
+            
+            // 计算新的规划状态(基于目标状态)
+            const calculatedStatus = calculatePlanStatus(plan);
+            // 映射为数据库中的规划状态值
+            const newPlanStatus = mapGoalStatusToPlanStatus(calculatedStatus);
+            const planStatusChanged = plan.status !== newPlanStatus;
+            
+            if (planStatusChanged) {
+                plan.status = newPlanStatus;
+            }
+            
+            // 保存到后端
+            try {
+                const payload = {
+                    title: plan.title,
+                    year: plan.year,
+                    goals: plan.goals.map(g => ({
+                        id: g.id,
+                        name: g.name,
+                        expected_timeframe: g.expected_timeframe,
+                        score_allocation: g.score_allocation,
+                        details: g.details,
+                        status: g.status
+                    })),
+                    status: newPlanStatus  // 使用映射后的状态值
+                };
+                
+                await apiRequest(`/api/plans/${planId}`, 'PUT', payload);
+                
+                // 更新缓存
+                const index = planDataCache.findIndex(p => p.id === planId);
+                if (index !== -1) {
+                    planDataCache[index] = { ...plan };
+                }
+                
+                // 重新渲染年度规划列表
+                renderPlanAccordion(planDataCache);
+            } catch (error) {
+                console.error('[状态更新] 保存失败:', error);
+            }
+        }
+    };
+
+    const buildExecutionGoalCards = (plans = []) => {
+        const emptyState = {
+            cards: [],
+            tasksByStatus: {
+                backlog: [],
+                todo: [],
+                doing: [],
+                done: []
+            }
+        };
+
+        if (!Array.isArray(plans) || !plans.length) {
+            registerExecutionTaskMeta([]);
+            pruneExecutionQueue([]);
+            pruneTaskStatusMap(new Set());
+            return emptyState;
+        }
+
+        const planMap = new Map(plans.map((plan) => [plan.id, plan]));
+        const cards = [];
+        const tasksByStatus = {
+            backlog: [],
+            todo: [],
+            doing: [],
+            done: []
+        };
+        const validEntries = [];
+        const validTaskKeys = new Set();
+        const taskMetaEntries = [];
+
+        goalExecutionQueue.forEach((entry) => {
+            const plan = planMap.get(entry.planId);
+            if (!plan || !Array.isArray(plan.goals)) {
+                return;
+            }
+            const goal = plan.goals.find((candidate) => candidate.id === entry.goalId);
+            if (!goal) {
+                return;
+            }
+            validEntries.push(entry);
+            const taskMetas = extractGoalTasks(goal.details).map((content, index) => {
+                const taskId = `${goal.id || 'goal'}-${index}`;
+                const key = taskKey(plan.id, goal.id, taskId);
+                validTaskKeys.add(key);
+                const status = getTaskStatus(plan.id, goal.id, taskId);
+                const meta = {
+                    planId: plan.id,
+                    planTitle: plan.title || '未命名规划',
+                    goalId: goal.id,
+                    goalName: goal.name || '未命名目标',
+                    taskId,
+                    content,
+                    status
+                };
+                tasksByStatus[status] = tasksByStatus[status] || [];
+                tasksByStatus[status].push(meta);
+                taskMetaEntries.push(meta);
+                return meta;
+            });
+            
+            // 重新计算目标状态
+            const calculatedGoalStatus = calculateGoalStatus(plan.id, goal.id, goal.details);
+            if (goal.status !== calculatedGoalStatus) {
+                goal.status = calculatedGoalStatus;
+            }
+
+            cards.push({
+                planId: plan.id,
+                planTitle: plan.title || '未命名规划',
+                goalId: goal.id,
+                name: goal.name || '未命名目标',
+                timeframe: goal.expected_timeframe,
+                score: goal.score_allocation || 0,
+                status: calculatedGoalStatus,
+                tasks: taskMetas
+            });
+        });
+
+        pruneExecutionQueue(validEntries);
+        pruneTaskStatusMap(validTaskKeys);
+        registerExecutionTaskMeta(taskMetaEntries);
+
+        return { cards, tasksByStatus };
+    };
+
+    const renderExecutionTaskCard = (task, { variant = 'board' } = {}) => {
+        const showOrigin = variant !== 'backlog';
+        const origin = showOrigin
+            ? `<p class="task-origin">${task.planTitle} · ${task.goalName}</p>`
+            : '';
+        const extraClass = variant === 'backlog' ? ' compact' : '';
+        return `
+            <div class="execution-task-card${extraClass}" draggable="true" data-plan-id="${task.planId}" data-goal-id="${task.goalId}" data-task-id="${task.taskId}" data-status="${task.status}">
+                ${origin}
+                <p class="task-content">${task.content}</p>
+            </div>
+        `;
+    };
+
+    const renderExecutionGoalCard = (card) => {
+        const hasTasks = card.tasks.length > 0;
+        const backlogTasks = card.tasks.filter((task) => task.status === 'backlog');
+        const timeframeChip = card.timeframe ? `<span class="execution-chip">预计 ${card.timeframe}</span>` : '';
+        const tasksHtml = hasTasks
+            ? `<div class="execution-goal-tasks" hidden>
+                    ${backlogTasks.length
+                        ? backlogTasks.map((task) => renderExecutionTaskCard(task, { variant: 'backlog' })).join('')
+                        : '<div class="execution-task-placeholder">拖拽任务返回此处，回到目标列表。</div>'}
+                </div>`
+            : '';
+        return `
+            <div class="execution-goal-card${hasTasks ? ' has-tasks' : ''}" data-plan-id="${card.planId}" data-goal-id="${card.goalId}" data-has-tasks="${hasTasks}">
+                <div class="execution-goal-head">
+                    <div>
+                        <p class="execution-goal-name">${card.name}</p>
+                        <p class="execution-goal-plan">所属规划：${card.planTitle}</p>
+                    </div>
+                    <span class="goal-status-pill ${card.status}">${goalStatusLabels[card.status] || card.status || '待开始'}</span>
+                </div>
+                <div class="execution-goal-meta">
+                    ${timeframeChip}
+                </div>
+                ${tasksHtml}
+            </div>
+        `;
+    };
+
+    const renderTaskColumnBody = (columnKey, tasks) => {
+        if (!tasks.length) {
+            return `<div class="execution-column-empty">${executionColumnPlaceholders[columnKey]}</div>`;
+        }
+        return tasks.map((task) => renderExecutionTaskCard(task, { variant: 'board' })).join('');
+    };
+
+    const renderGoalExecutionBoard = (plans = []) => {
+        if (!goalExecutionList) return;
+        
+        // 在重新渲染前，保存当前展开的卡片状态
+        const currentExpandedCards = goalExecutionList.querySelectorAll('.execution-goal-card.expanded');
+        currentExpandedCards.forEach(card => {
+            const goalId = card.dataset.goalId;
+            if (goalId) {
+                expandedGoalCards.add(goalId);
+            }
+        });
+        
+        const { cards, tasksByStatus } = buildExecutionGoalCards(plans);
+        const backlogBody = cards.length
+            ? cards.map((card) => renderExecutionGoalCard(card)).join('')
+            : `<div class="execution-column-empty">${executionColumnPlaceholders.backlog}</div>`;
+
+        const boardHtml = executionColumns.map((column) => {
+            const bodyContent = column.key === 'backlog'
+                ? backlogBody
+                : renderTaskColumnBody(column.key, tasksByStatus[column.key]);
+            return `
+                <div class="execution-column" data-column="${column.key}">
+                    <div class="execution-column-header">
+                        <h3>${column.icon} ${column.title}</h3>
+                    </div>
+                    <div class="execution-column-body" data-drop-column="${column.key}">
+                        ${bodyContent}
+                    </div>
+                </div>
+            `;
+        }).join('');
+
+        goalExecutionList.innerHTML = boardHtml;
+        
+        // 恢复之前展开的卡片状态
+        requestAnimationFrame(() => {
+            expandedGoalCards.forEach(goalId => {
+                const card = goalExecutionList.querySelector(`.execution-goal-card[data-goal-id="${goalId}"]`);
+                if (card && card.dataset.hasTasks === 'true') {
+                    const tasksContainer = card.querySelector('.execution-goal-tasks');
+                    if (tasksContainer) {
+                        tasksContainer.hidden = false;
+                        card.classList.add('expanded');
+                    }
+                }
+            });
+        });
+        
+        attachExecutionBoardDnDHandlers();
+    };
+
+    const handleTaskDragStart = (event) => {
+        const card = event.currentTarget;
+        const planId = card.dataset.planId;
+        const goalId = card.dataset.goalId;
+        const taskId = card.dataset.taskId;
+        if (!planId || !goalId || !taskId) return;
+        draggedTaskCard = { 
+            planId, 
+            goalId, 
+            taskId, 
+            status: card.dataset.status || 'backlog',
+            previousStatus: card.dataset.status || 'backlog'
+        };
+        card.classList.add('dragging');
+        if (event.dataTransfer) {
+            event.dataTransfer.effectAllowed = 'move';
+            event.dataTransfer.setData('text/plain', taskId);
+        }
+    };
+
+    const handleTaskDragEnd = (event) => {
+        event.currentTarget.classList.remove('dragging');
+        draggedTaskCard = null;
+    };
+
+    const handleColumnDragOver = (event) => {
+        if (!draggedTaskCard) return;
+        const columnKey = event.currentTarget?.dataset?.dropColumn;
+        if (!['todo', 'doing', 'done'].includes(columnKey)) return;
+        event.preventDefault();
+        event.dataTransfer.dropEffect = 'move';
+        event.currentTarget.classList.add('drop-hover');
+    };
+
+    const handleColumnDragLeave = (event) => {
+        event.currentTarget.classList.remove('drop-hover');
+    };
+
+    const openTaskEventModal = async (taskMeta, onSuccess, onCancel) => {
+        if (!taskMeta || !window.eventManager) return;
+        try {
+            await ensureEventTypesLoaded();
+        } catch (error) {
+            console.warn('[Planning] 事件类型加载失败，无法打开事件弹窗:', error);
+        }
+        const title = `${taskMeta.goalName} · ${taskMeta.content}`.slice(0, 60);
+        const defaults = {
+            title,
+            remark: `来源：${taskMeta.planTitle} / ${taskMeta.goalName}\n任务：${taskMeta.content}`,
+            date: new Date()
+        };
+        
+        // 保存原始回调
+        const originalOnEventsChanged = window.eventManager.onEventsChanged;
+        const originalCloseModal = window.eventManager.closeModal.bind(window.eventManager);
+        
+        // 标记事件是否已保存
+        let eventSaved = false;
+        
+        // 临时替换onEventsChanged回调
+        window.eventManager.onEventsChanged = function() {
+            eventSaved = true;
+            if (originalOnEventsChanged) {
+                originalOnEventsChanged.call(this);
+            }
+            if (onSuccess) {
+                onSuccess();
+            }
+        };
+        
+        // 临时替换closeModal方法
+        window.eventManager.closeModal = function() {
+            originalCloseModal();
+            
+            // 恢复原始回调
+            window.eventManager.onEventsChanged = originalOnEventsChanged;
+            window.eventManager.closeModal = originalCloseModal;
+            
+            // 如果关闭时没有保存事件，调用取消回调
+            if (!eventSaved && onCancel) {
+                onCancel();
+            }
+        };
+        
+        window.eventManager.openForCreate(defaults);
+    };
+
+    const handleColumnDrop = (event) => {
+        if (!draggedTaskCard) return;
+        const columnKey = event.currentTarget?.dataset?.dropColumn;
+        event.preventDefault();
+        event.currentTarget.classList.remove('drop-hover');
+        if (!['todo', 'doing', 'done'].includes(columnKey)) return;
+        
+        const taskMeta = getExecutionTaskMeta(draggedTaskCard.planId, draggedTaskCard.goalId, draggedTaskCard.taskId);
+        const previousStatus = draggedTaskCard.previousStatus;
+        if (columnKey === 'doing') {
+            // 先弹窗，只有成功才移动
+            openTaskEventModal(
+                taskMeta,
+                () => {
+                    // 事件创建成功，移动任务
+                    setTaskStatus(draggedTaskCard.planId, draggedTaskCard.goalId, draggedTaskCard.taskId, columnKey);
+                },
+                () => {
+                    // 事件创建取消，不做任何变动
+                }
+            );
+        } else {
+            setTaskStatus(draggedTaskCard.planId, draggedTaskCard.goalId, draggedTaskCard.taskId, columnKey);
+        }
+        
+        draggedTaskCard = null;
+    };
+
+    const handleGoalCardDragOver = (event) => {
+        if (!draggedTaskCard) return;
+        const card = event.currentTarget;
+        if (card.dataset.goalId !== draggedTaskCard.goalId) return;
+        event.preventDefault();
+        event.dataTransfer.dropEffect = 'move';
+        card.classList.add('drop-hover');
+    };
+
+    const handleGoalCardDragLeave = (event) => {
+        event.currentTarget.classList.remove('drop-hover');
+    };
+
+    const handleGoalCardDrop = (event) => {
+        if (!draggedTaskCard) return;
+        const card = event.currentTarget;
+        if (card.dataset.goalId !== draggedTaskCard.goalId) return;
+        event.preventDefault();
+        card.classList.remove('drop-hover');
+        setTaskStatus(draggedTaskCard.planId, draggedTaskCard.goalId, draggedTaskCard.taskId, 'backlog');
+        draggedTaskCard = null;
+    };
+
+    const handleGoalCardDblClick = (event) => {
+        const card = event.currentTarget;
+        
+        console.log('[双击事件] 触发', {
+            hasTasks: card.dataset.hasTasks,
+            target: event.target.className,
+            currentTarget: event.currentTarget.className
+        });
+        
+        // 防止双击时触发拖拽事件和文本选择
+        event.preventDefault();
+        event.stopPropagation();
+        
+        if (card.dataset.hasTasks !== 'true') {
+            console.log('[双击事件] 卡片没有任务，跳过');
+            return;
+        }
+        
+        const tasksContainer = card.querySelector('.execution-goal-tasks');
+        if (!tasksContainer) {
+            console.log('[双击事件] 未找到任务容器');
+            return;
+        }
+        
+        const goalId = card.dataset.goalId;
+        // 修复逻辑：hidden为true表示隐藏（收起），false表示显示（展开）
+        const isCurrentlyHidden = tasksContainer.hidden;
+        const willBeVisible = isCurrentlyHidden; // 切换后的状态
+        tasksContainer.hidden = !isCurrentlyHidden;
+        card.classList.toggle('expanded', willBeVisible);
+        
+        // 更新展开状态集合
+        if (willBeVisible) {
+            expandedGoalCards.add(goalId);
+        } else {
+            expandedGoalCards.delete(goalId);
+        }
+        
+        console.log('[双击事件] 切换状态', { 
+            wasHidden: isCurrentlyHidden,
+            nowVisible: willBeVisible,
+            expandedCount: expandedGoalCards.size
+        });
+    };
+
+    const attachExecutionBoardDnDHandlers = () => {
+        if (!goalExecutionList) return;
+        const taskCards = goalExecutionList.querySelectorAll('.execution-task-card[draggable="true"]');
+        taskCards.forEach((card) => {
+            card.removeEventListener('dragstart', handleTaskDragStart);
+            card.removeEventListener('dragend', handleTaskDragEnd);
+            card.addEventListener('dragstart', handleTaskDragStart);
+            card.addEventListener('dragend', handleTaskDragEnd);
+        });
+
+        const columnBodies = goalExecutionList.querySelectorAll('.execution-column-body');
+        columnBodies.forEach((body) => {
+            body.removeEventListener('dragover', handleColumnDragOver);
+            body.removeEventListener('dragleave', handleColumnDragLeave);
+            body.removeEventListener('drop', handleColumnDrop);
+            body.addEventListener('dragover', handleColumnDragOver);
+            body.addEventListener('dragleave', handleColumnDragLeave);
+            body.addEventListener('drop', handleColumnDrop);
+        });
+
+        const backlogCards = goalExecutionList.querySelectorAll('.execution-column[data-column="backlog"] .execution-goal-card');
+        backlogCards.forEach((card) => {
+            card.removeEventListener('dragover', handleGoalCardDragOver);
+            card.removeEventListener('dragleave', handleGoalCardDragLeave);
+            card.removeEventListener('drop', handleGoalCardDrop);
+            card.removeEventListener('dblclick', handleGoalCardDblClick);
+            card.addEventListener('dragover', handleGoalCardDragOver);
+            card.addEventListener('dragleave', handleGoalCardDragLeave);
+            card.addEventListener('drop', handleGoalCardDrop);
+            card.addEventListener('dblclick', handleGoalCardDblClick);
+        });
+    };
+
+    // 使用事件委托处理双击事件
+    if (goalExecutionList) {
+        goalExecutionList.removeEventListener('dblclick', handleGoalExecutionDblClick);
+        goalExecutionList.addEventListener('dblclick', handleGoalExecutionDblClick);
+    }
+
+    function handleGoalExecutionDblClick(event) {
+        const card = event.target.closest('.execution-goal-card');
+        if (!card) return;
+        
+        console.log('[委托双击] 触发', {
+            hasTasks: card.dataset.hasTasks,
+            targetClass: event.target.className
+        });
+        
+        handleGoalCardDblClick({ 
+            currentTarget: card, 
+            target: event.target,
+            preventDefault: () => event.preventDefault(),
+            stopPropagation: () => event.stopPropagation()
+        });
+    }
+
+    const findPlanById = (planId) => {
+        if (!planId) return null;
+        return planDataCache.find((plan) => plan.id === planId) || null;
+    };
+
+    const handlePlanEdit = (planId) => {
+        if (!planId) return;
+        const targetPlan = findPlanById(planId);
+        if (!targetPlan) {
+            alert('未找到该规划，可能已被删除。');
+            return;
+        }
+        openPlanModal(targetPlan);
+    };
+
+    const confirmDeletePlan = async (planId) => {
+        if (!planId) return;
+        if (!hasPlansApi) {
+            alert('年度规划接口未加载，暂时无法删除。');
+            return;
+        }
+        const plan = findPlanById(planId);
+        const planLabel = plan?.title || '该规划';
+        const confirmed = confirm(`确定删除「${planLabel}」？此操作不可撤销。`);
+        if (!confirmed) return;
+        try {
+            await window.plansApi.remove(planId);
+            await loadPlans(true);
+        } catch (error) {
+            const message = error?.payload?.error || error.message || '删除规划失败，请稍后再试。';
+            alert(message);
+        }
+    };
+
+    const handleGoalExecuteTrigger = (button) => {
+        if (!button || button.disabled) return;
+        const { planId, goalId } = button.dataset;
+        if (!planId || !goalId) return;
+        if (isGoalQueued(planId, goalId)) {
+            removeGoalFromExecutionQueue(planId, goalId);
+        } else {
+            addGoalToExecutionQueue(planId, goalId);
+        }
+    };
+
+    const syncGoalRemoveButtons = () => {
+        if (!planGoalsContainer) return;
+        const rows = planGoalsContainer.querySelectorAll('[data-goal-row]');
+        rows.forEach((row) => {
+            const removeBtn = row.querySelector('[data-remove-goal]');
+            if (removeBtn) {
+                removeBtn.disabled = rows.length === 1;
+            }
+        });
+    };
+
+    const addGoalRow = (goalData = null) => {
+        if (!planGoalTemplate || !planGoalsContainer) return null;
+        const fragment = planGoalTemplate.content.cloneNode(true);
+        planGoalsContainer.appendChild(fragment);
+        const rows = planGoalsContainer.querySelectorAll('[data-goal-row]');
+        const newRow = rows[rows.length - 1] || null;
+        if (newRow && goalData) {
+            // 设置目标ID
+            if (goalData.id) {
+                newRow.dataset.goalId = goalData.id;
+            }
+            
+            const nameInput = newRow.querySelector('.goal-name');
+            const timeframeInput = newRow.querySelector('.goal-timeframe');
+            const detailsInput = newRow.querySelector('.goal-details');
+            const scoreInput = newRow.querySelector('.goal-score');
+            if (nameInput) {
+                nameInput.value = goalData.name || '';
+            }
+            if (timeframeInput) {
+                timeframeInput.value = goalData.expected_timeframe || '';
+            }
+            if (detailsInput) {
+                detailsInput.value = goalData.details || '';
+            }
+            if (scoreInput) {
+                const scoreValue = Number(goalData.score_allocation || 0);
+                scoreInput.value = scoreValue > 0 ? String(scoreValue) : '';
+            }
+        }
+        syncGoalRemoveButtons();
+        return newRow;
+    };
+
+    const hydrateGoalRows = (goals = []) => {
+        if (!planGoalsContainer) return;
+        planGoalsContainer.innerHTML = '';
+        if (Array.isArray(goals) && goals.length) {
+            goals.forEach((goal) => addGoalRow(goal));
+        } else {
+            addGoalRow();
+        }
+        refreshPlanScoreSummary();
+    };
+
+    const resetGoalRows = () => {
+        hydrateGoalRows();
+    };
+
+    const clearPlanModalError = () => {
+        if (!planModalError) return;
+        planModalError.textContent = '';
+        planModalError.classList.remove('visible');
+    };
+
+    const showPlanModalError = (message) => {
+        if (!planModalError) {
+            alert(message);
+            return;
+        }
+        planModalError.textContent = message;
+        planModalError.classList.add('visible');
+    };
+
+    const setPlanSubmitLoading = (isLoading) => {
+        if (!planSubmitButton) return;
+        planSubmitButton.dataset.loading = isLoading ? 'true' : 'false';
+        planSubmitButton.disabled = isLoading;
+        planSubmitButton.textContent = isLoading ? '保存中...' : getPlanSubmitIdleText();
+        if (planModalContent) {
+            planModalContent.classList.toggle('is-loading', isLoading);
+        }
+    };
+
+    const closePlanModal = () => {
+        if (!planModalElement) return;
+        planModalElement.classList.add('hidden');
+        planModalElement.setAttribute('aria-hidden', 'true');
+        document.body.style.overflow = '';
+        resetPlanModalState();
+        clearPlanModalError();
+        if (planForm) {
+            planForm.reset();
+        }
+        resetGoalRows();
+        updatePlanTotalValue(0);
+        updatePlanModalRemainingDisplay(0);
+        setPlanModalYear(defaultPlanYear);
+        setPlanSubmitLoading(false);
+        updatePlanCreateAvailability();
+    };
+
+    const openPlanModal = (plan = null) => {
+        if (!planModalElement) return;
+        const editingMode = Boolean(plan);
+        if (!hasPlansApi) {
+            alert('年度规划接口未加载，暂时无法操作规划。');
+            return;
+        }
+        if (!editingMode && currentRemainingScore <= 0) {
+            alert('100 分预算已用完，暂时无法创建新的规划。');
+            return;
+        }
+
+        editingPlanId = editingMode ? plan?.id || null : null;
+        editingPlanOriginalScore = editingMode ? Number(plan?.score_allocation || 0) : 0;
+        setPlanModalMode(editingMode ? 'edit' : 'create', plan?.title || '');
+
+        if (planForm) {
+            planForm.reset();
+        }
+        clearPlanModalError();
+
+        if (planTitleInput) {
+            planTitleInput.value = editingMode ? (plan?.title || '') : '';
+        }
+        if (planDescriptionInput) {
+            planDescriptionInput.value = editingMode ? (plan?.description || '') : '';
+        }
+        if (editingMode && plan) {
+            hydrateGoalRows(plan.goals || []);
+        } else {
+            resetGoalRows();
+        }
+
+        const targetYear = editingMode ? Number(plan?.year) || defaultPlanYear : defaultPlanYear;
+        setPlanModalYear(targetYear);
+
+        const currentAllocation = editingMode ? Number(plan?.score_allocation || 0) : 0;
+        updatePlanTotalValue(currentAllocation);
+        updatePlanModalRemainingDisplay(currentAllocation);
+        planModalElement.classList.remove('hidden');
+        planModalElement.setAttribute('aria-hidden', 'false');
+        document.body.style.overflow = 'hidden';
+        updatePlanCreateAvailability();
+        if (planTitleInput) {
+            planTitleInput.focus();
+        }
+    };
+
+    if (openPlanModalButton) {
+        openPlanModalButton.addEventListener('click', () => {
+            if (openPlanModalButton.disabled) return;
+            openPlanModal();
+        });
+    }
+    if (planModalCloseButton) {
+        planModalCloseButton.addEventListener('click', closePlanModal);
+    }
+    if (planModalCancelButton) {
+        planModalCancelButton.addEventListener('click', closePlanModal);
+    }
+    document.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape' && planModalElement && !planModalElement.classList.contains('hidden')) {
+            closePlanModal();
+        }
+    });
+
+    if (planAccordion) {
+        planAccordion.addEventListener('click', (event) => {
+            const editBtn = event.target.closest('.plan-edit-btn');
+            if (editBtn) {
+                event.preventDefault();
+                event.stopPropagation();
+                handlePlanEdit(editBtn.dataset.planId);
+                return;
+            }
+            const deleteBtn = event.target.closest('.plan-delete-btn');
+            if (deleteBtn) {
+                event.preventDefault();
+                event.stopPropagation();
+                confirmDeletePlan(deleteBtn.dataset.planId);
+                return;
+            }
+            const executeBtn = event.target.closest('.goal-execute-btn');
+            if (executeBtn) {
+                event.preventDefault();
+                event.stopPropagation();
+                handleGoalExecuteTrigger(executeBtn);
+            }
+        });
+    }
+
+    const handleGoalRemove = (event) => {
+        if (!planGoalsContainer) return;
+        const target = event.target.closest('[data-remove-goal]');
+        if (!target) return;
+        event.preventDefault();
+        const row = target.closest('[data-goal-row]');
+        if (row) {
+            row.remove();
+            if (!planGoalsContainer.querySelector('[data-goal-row]')) {
+                addGoalRow();
+            }
+            syncGoalRemoveButtons();
+            refreshPlanScoreSummary();
+        }
+    };
+
+    if (planGoalsContainer) {
+        planGoalsContainer.addEventListener('click', handleGoalRemove);
+        planGoalsContainer.addEventListener('input', (event) => {
+            const target = event.target;
+            if (target && target.classList.contains('goal-score')) {
+                handleGoalScoreInput();
+            } else {
+                clearPlanModalError();
+            }
+        });
+    }
+    if (addGoalRowButton) {
+        addGoalRowButton.addEventListener('click', (event) => {
+            event.preventDefault();
+            const newRow = addGoalRow();
+            if (newRow) {
+                const goalNameInput = newRow.querySelector('.goal-name');
+                if (goalNameInput) {
+                    goalNameInput.focus();
+                }
+            }
+            clearPlanModalError();
+            refreshPlanScoreSummary();
+        });
+    }
+    [planTitleInput, planDescriptionInput].forEach((input) => {
+        if (input) {
+            input.addEventListener('input', clearPlanModalError);
+        }
+    });
+
+    const handleGoalScoreInput = () => {
+        refreshPlanScoreSummary();
+        clearPlanModalError();
+    };
+
+    if (planForm) {
+        planForm.addEventListener('submit', async (event) => {
+            event.preventDefault();
+            const editingMode = isPlanEditing();
+            if (!hasPlansApi) {
+                showPlanModalError('年度规划接口未加载，暂时无法创建。');
+                return;
+            }
+            if (!editingMode && currentRemainingScore <= 0) {
+                showPlanModalError('100 分预算已用完，暂时无法创建新的规划。');
+                return;
+            }
+            if (editingMode && !editingPlanId) {
+                showPlanModalError('未找到需要编辑的规划，请重试。');
+                return;
+            }
+            const title = planTitleInput?.value.trim() || '';
+            if (!title) {
+                showPlanModalError('请填写规划名称。');
+                planTitleInput?.focus();
+                return;
+            }
+            if (!planGoalsContainer) {
+                showPlanModalError('请至少添加一个目标。');
+                return;
+            }
+            const rows = getGoalRows();
+            if (!rows.length) {
+                showPlanModalError('请至少添加一个目标。');
+                return;
+            }
+            const goals = [];
+            let totalScore = 0;
+            for (const row of rows) {
+                const nameInput = row.querySelector('.goal-name');
+                const timeframeInput = row.querySelector('.goal-timeframe');
+                const detailsInput = row.querySelector('.goal-details');
+                const scoreInput = row.querySelector('.goal-score');
+                const name = nameInput?.value.trim() || '';
+                if (!name) {
+                    showPlanModalError('每个目标都需要名称。');
+                    nameInput?.focus();
+                    return;
+                }
+                const details = detailsInput?.value.trim() || '';
+                if (!details) {
+                    showPlanModalError('每个目标都需要填写详情。');
+                    detailsInput?.focus();
+                    return;
+                }
+                const goalScore = parseInt(scoreInput?.value, 10);
+                if (!Number.isInteger(goalScore) || goalScore <= 0) {
+                    showPlanModalError('请为每个目标设置 1-100 之间的分值。');
+                    scoreInput?.focus();
+                    return;
+                }
+                totalScore += goalScore;
+                
+                // 保留原有的目标ID和状态
+                const goalId = row.dataset.goalId || null;
+                const goal = {
+                    name,
+                    expected_timeframe: timeframeInput?.value.trim() || null,
+                    details: details,
+                    score_allocation: goalScore
+                };
+                
+                if (goalId) {
+                    goal.id = goalId;
+                    
+                    // 如果是编辑模式，直接从缓存保留原有状态
+                    // 不要重新计算，因为任务ID可能因details改变而变化
+                    if (editingMode && editingPlanId) {
+                        const existingPlan = planDataCache.find(p => p.id === editingPlanId);
+                        if (existingPlan && existingPlan.goals) {
+                            const existingGoal = existingPlan.goals.find(g => g.id === goalId);
+                            if (existingGoal && existingGoal.status) {
+                                goal.status = existingGoal.status;
+                            }
+                        }
+                    }
+                }
+                
+                goals.push(goal);
+            }
+
+            if (totalScore <= 0) {
+                showPlanModalError('请至少分配 1 分。');
+                return;
+            }
+
+            const capacity = getPlanModalCapacity();
+            if (totalScore > capacity) {
+                showPlanModalError(`最多可用 ${capacity} 分，当前已分配 ${totalScore} 分。`);
+                updatePlanModalRemainingDisplay(totalScore);
+                return;
+            }
+
+            const selectedYear = getPlanModalYearValue() || defaultPlanYear;
+            const payload = {
+                title,
+                description: planDescriptionInput?.value.trim() || null,
+                year: selectedYear,
+                goals
+            };
+
+            console.log('=== 保存规划 Debug ===');
+            console.log('editingMode:', editingMode);
+            console.log('editingPlanId:', editingPlanId);
+            console.log('payload.goals:', JSON.stringify(payload.goals, null, 2));
+            console.log('planDataCache:', planDataCache);
+
+            try {
+                clearPlanModalError();
+                setPlanSubmitLoading(true);
+                const result = editingMode
+                    ? await window.plansApi.update(editingPlanId, payload)
+                    : await window.plansApi.create(payload);
+                
+                console.log('=== 服务器返回 ===');
+                console.log('result.plan:', result?.plan);
+                
+                if (result?.plan) {
+                    if (editingMode) {
+                        const targetIndex = planDataCache.findIndex((planItem) => planItem.id === editingPlanId);
+                        if (targetIndex >= 0) {
+                            planDataCache.splice(targetIndex, 1, result.plan);
+                        } else {
+                            planDataCache = [result.plan, ...planDataCache];
+                        }
+                    } else {
+                        planDataCache = [result.plan, ...planDataCache];
+                    }
+                    planningDataLoaded = true;
+                }
+                const nextRemaining = toSafeNumber(result?.remaining_score, currentRemainingScore);
+                setRemainingScore(nextRemaining);
+                renderPlanAccordion(planDataCache);
+                renderGoalExecutionBoard(planDataCache);
+                closePlanModal();
+            } catch (error) {
+                const message = error?.payload?.error || error.message || (editingMode ? '更新规划失败，请稍后再试。' : '创建规划失败，请稍后再试。');
+                const errorRemaining = toSafeNumber(error?.payload?.remaining_score, null);
+                if (errorRemaining !== null) {
+                    setRemainingScore(errorRemaining);
+                }
+                showPlanModalError(message);
+            } finally {
+                setPlanSubmitLoading(false);
+                updatePlanCreateAvailability();
+            }
+        });
+    }
+
+    const collectExpandedPlanIds = () => {
+        if (!planAccordion) return new Set();
+        const expanded = new Set();
+        const expandedItems = planAccordion.querySelectorAll('.plan-item[data-expanded="true"]');
+        expandedItems.forEach((item) => {
+            const planId = item.getAttribute('data-plan-id');
+            if (planId) {
+                expanded.add(planId);
+            }
+        });
+        return expanded;
+    };
+
+    const restoreExpandedPlanIds = (expandedIds) => {
+        if (!planAccordion || !expandedIds || expandedIds.size === 0) return;
+        expandedIds.forEach((planId) => {
+            if (!planId) return;
+            const planItem = planAccordion.querySelector(`.plan-item[data-plan-id="${planId}"]`);
+            if (!planItem) return;
+            planItem.setAttribute('data-expanded', 'true');
+            const toggle = planItem.querySelector('.plan-toggle');
+            if (toggle) {
+                toggle.setAttribute('aria-expanded', 'true');
+            }
+        });
+    };
+
+    const renderPlanAccordion = (plans = []) => {
+        if (!planAccordion) return;
+        const previouslyExpanded = collectExpandedPlanIds();
+        if (!plans.length) {
+            planAccordion.innerHTML = '<div class="plan-empty-state">尚未创建年度规划，可稍后开启演示数据或等待创建功能。</div>';
+            return;
+        }
+
+        const html = plans.map((plan) => {
+            const goals = plan.goals || [];
+            
+            // 重新计算每个目标的状态
+            goals.forEach(goal => {
+                const calculatedStatus = calculateGoalStatus(plan.id, goal.id, goal.details);
+                if (goal.status !== calculatedStatus) {
+                    goal.status = calculatedStatus;
+                }
+            });
+            
+            // 重新计算规划状态
+            const calculatedPlanStatus = calculatePlanStatus(plan);
+            if (plan.status !== calculatedPlanStatus) {
+                plan.status = calculatedPlanStatus;
+            }
+            
+            const statusText = planStatusLabels[plan.status] || plan.status || '草稿';
+            const planIdAttr = plan.id || '';
+            const planYearChip = plan.year ? `<span class="plan-year-chip">${plan.year} 年</span>` : '';
+            const goalsHtml = goals.length
+                ? `<div class="plan-goal-list" data-plan-id="${planIdAttr}">${goals.map((goal) => {
+                        const goalIdAttr = goal.id || '';
+                        const queued = planIdAttr && goalIdAttr ? isGoalQueued(planIdAttr, goalIdAttr) : false;
+                        const canQueue = Boolean(planIdAttr && goalIdAttr);
+                        const executeLabel = queued ? '已追踪' : (canQueue ? '追踪' : '保存后追踪');
+                        const executeDisabled = !canQueue;
+                        const executeStateClass = queued ? ' is-executed' : '';
+                        return `
+                            <div class="plan-goal-item" data-goal-id="${goalIdAttr}" draggable="true">
+                                <div class="plan-goal-inline">
+                                    <span class="plan-goal-title">${goal.name || '未命名目标'}</span>
+                                    ${goal.expected_timeframe ? `<span class="goal-timeframe"><span class="goal-meta-label">预计</span>${goal.expected_timeframe}</span>` : ''}
+                                    ${goal.details ? `<span class="goal-details">${goal.details}</span>` : ''}
+                                </div>
+                                <div class="plan-goal-side">
+                                    <span class="goal-score-chip">${goal.score_allocation || 0} 分</span>
+                                    <span class="goal-status-pill ${goal.status || 'pending'}">${goalStatusLabels[goal.status] || goal.status || '待开始'}</span>
+                                    <button type="button" class="goal-execute-btn${executeStateClass}" data-plan-id="${planIdAttr}" data-goal-id="${goalIdAttr}" ${executeDisabled ? 'disabled' : ''} draggable="false">${executeLabel}</button>
+                                </div>
+                            </div>
+                        `;
+                    }).join('')}</div>`
+                : '<div class="plan-empty-state">该规划还没有目标，后续阶段可添加。</div>';
+
+            return `
+                <article class="plan-item" data-plan-id="${planIdAttr}" data-expanded="false">
+                    <div class="plan-item-header">
+                        <button type="button" class="plan-toggle" aria-expanded="false">
+                            <div>
+                                <h3>${plan.title || '未命名规划'}</h3>
+                                ${plan.description ? `<p>${plan.description}</p>` : ''}
+                            </div>
+                        </button>
+                        <div class="plan-toolbar" aria-label="规划操作">
+                            ${planYearChip}
+                            <span class="plan-status ${plan.status || 'draft'}">${statusText}</span>
+                            <span class="plan-score-badge">总分 ${plan.score_allocation || 0} 分</span>
+                            <button type="button" class="plan-action-btn plan-edit-btn" data-plan-id="${planIdAttr}">编辑</button>
+                            <button type="button" class="plan-action-btn plan-delete-btn" data-plan-id="${planIdAttr}">删除</button>
+                        </div>
+                    </div>
+                    <div class="plan-body">
+                        ${goalsHtml}
+                    </div>
+                </article>
+            `;
+        }).join('');
+
+        planAccordion.innerHTML = html;
+        restoreExpandedPlanIds(previouslyExpanded);
+        attachPlanToggleHandlers();
+        enableGoalDragAndDrop();
+    };
+
+    const loadPlans = async (forceRefresh = false) => {
+        if (!hasPlansApi || !planAccordion) {
+            if (planAccordion && !hasPlansApi) {
+                planAccordion.innerHTML = '<div class="plan-empty-state">未加载 plans-api.js，无法获取年度规划数据。</div>';
+            }
+            if (planningLoadingEl) {
+                planningLoadingEl.classList.add('hidden');
+            }
+            return;
+        }
+
+        if (planningDataLoaded && !forceRefresh) {
+            renderPlanAccordion(planDataCache);
+            renderGoalExecutionBoard(planDataCache);
+            return;
+        }
+
+        setPlanningLoading(true);
+        try {
+            const payload = await window.plansApi.list();
+            planDataCache = Array.isArray(payload?.plans) ? payload.plans : [];
+            planningDataLoaded = true;
+            const nextRemaining = toSafeNumber(payload?.remaining_score, 100);
+            setRemainingScore(nextRemaining);
+            renderPlanAccordion(planDataCache);
+            renderGoalExecutionBoard(planDataCache);
+        } catch (error) {
+            console.error('[Planning] 获取年度规划失败:', error);
+            const message = error?.payload?.error || error?.message || '无法加载年度规划，请稍后再试。';
+            planAccordion.innerHTML = `<div class="plan-empty-state">${message}</div>`;
+        } finally {
+            setPlanningLoading(false);
+        }
+    };
 
     const handleEventsChanged = () => {
         updateApiStatus();
@@ -661,6 +2307,27 @@ document.addEventListener('DOMContentLoaded', () => { // 监听页面加载完�
             } else if (targetPage === 'stats') {
                 // 加载统计数据
                 loadStats();
+            } else if (targetPage === 'ideas') {
+                loadPlans();
+            }
+        });
+    });
+
+    planningTabButtons.forEach((btn) => {
+        btn.addEventListener('click', () => {
+            const target = btn.dataset.planningTab;
+            if (!target) return;
+            planningTabButtons.forEach((tabBtn) => {
+                const isActive = tabBtn === btn;
+                tabBtn.classList.toggle('active', isActive);
+                tabBtn.setAttribute('aria-selected', isActive.toString());
+            });
+            planningTabPanels.forEach((panel) => {
+                const match = panel.dataset.panel === target;
+                panel.classList.toggle('active', match);
+            });
+            if (target === 'annual') {
+                loadPlans();
             }
         });
     });
@@ -841,6 +2508,7 @@ document.addEventListener('DOMContentLoaded', () => { // 监听页面加载完�
     }); // 事件监听结束
 
     fetchIdeas(); // 首次加载时请求灵感收纳箱
+    loadPlans(); // 同步加载年度规划列表
     setInterval(updateApiStatus, 30000); // 每 30 秒刷新一次服务状态
 
     // ============ 数据统计功能 ============

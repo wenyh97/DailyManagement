@@ -10,6 +10,8 @@ from . import idea  # noqa: F401, 导入以注册模型到元数据
 from . import event_type  # noqa: F401, 导入以注册模型到元数据
 from . import daily_score  # noqa: F401, 导入以注册模型到元数据
 from . import user  # noqa: F401, 导入以注册模型到元数据
+from . import annual_plan  # noqa: F401, 导入以注册模型到元数据
+from . import plan_goal  # noqa: F401, 导入以注册模型到元数据
 
 # 自动加载仓库根目录下的 .env 配置
 load_dotenv(find_dotenv(filename=".env", raise_error_if_not_found=False))

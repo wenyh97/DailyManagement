@@ -36,11 +36,11 @@
                 
                 <!-- 中间：导航菜单 -->
                 <nav class="header-nav">
-                    <button class="nav-btn active" data-page="ideas">
+                    <button class="nav-btn" data-page="ideas">
                         <span class="nav-icon">💡</span>
-                        <span>灵感收集</span>
+                        <span>任务管理</span>
                     </button>
-                    <button class="nav-btn" data-page="daily">
+                    <button class="nav-btn active" data-page="daily">
                         <span class="nav-icon">📅</span>
                         <span>日常管理</span>
                     </button>
@@ -69,26 +69,143 @@
         </header>
         
         <main>
-            <!-- 灵感收集页面 -->
-            <div id="page-ideas" class="page-content active">
-                <div class="glass-card">
-                    <div class="section-header">
-                        <h2><span class="icon">💡</span> 灵感收集站</h2>
-                        <select id="idea-sort" class="idea-sort-select">
-                            <option value="time">按时间排序</option>
-                            <option value="priority">按优先级排序</option>
-                        </select>
+            <!-- 任务管理页面（含年度规划） -->
+            <div id="page-ideas" class="page-content">
+                <div class="planning-workspace" id="planning-workspace">
+                    <div class="planning-tab-buttons" role="tablist" aria-label="规划工作区子页签">
+                        <button class="planning-tab-btn active" data-planning-tab="annual" role="tab" aria-selected="true">年度规划</button>
+                        <button class="planning-tab-btn" data-planning-tab="execution" role="tab" aria-selected="false">目标执行</button>
+                        <button class="planning-tab-btn" data-planning-tab="tasks" role="tab" aria-selected="false">任务管理</button>
                     </div>
-                    <div id="ideas-list" class="ideas-container"></div>
-                    <div class="input-group">
-                        <input type="text" id="new-idea" placeholder="💭 记录你的灵感和想法...">
-                        <button id="add-idea" class="btn-primary">+ 添加</button>
+
+                    <section id="planning-panel-annual" class="planning-tab-panel active" data-panel="annual" role="tabpanel">
+                        <div class="glass-card planning-card">
+                            <div class="section-header planning-header">
+                                <h2><span class="icon">🎯</span> 年度规划</h2>
+                                <div class="planning-actions">
+                                    <button type="button" class="btn-primary planning-add-btn" id="open-plan-modal">+ 添加规划</button>
+                                </div>
+                            </div>
+                            <div id="planning-loading" class="planning-loading">
+                                <span class="loading-dot"></span>
+                                <span>正在加载年度规划...</span>
+                            </div>
+                            <div id="plan-accordion" class="plan-accordion"></div>
+                        </div>
+                    </section>
+
+                    <section id="planning-panel-execution" class="planning-tab-panel" data-panel="execution" role="tabpanel">
+                        <div class="glass-card planning-card">
+                            <div class="section-header planning-header">
+                                <h2><span class="icon">🚀</span> 目标执行</h2>
+                            </div>
+                            <div id="goal-execution-list" class="goal-execution-board">
+                                <div class="goal-empty">点击年度规划中的“执行”按钮，即可在此构建目标执行看板。</div>
+                            </div>
+                        </div>
+                    </section>
+
+                    <section id="planning-panel-tasks" class="planning-tab-panel" data-panel="tasks" role="tabpanel">
+                        <div class="glass-card">
+                            <div class="section-header">
+                                <h2><span class="icon">💡</span> 灵感收集站</h2>
+                                <select id="idea-sort" class="idea-sort-select">
+                                    <option value="time">按时间排序</option>
+                                    <option value="priority">按优先级排序</option>
+                                </select>
+                            </div>
+                            <div id="ideas-list" class="ideas-container"></div>
+                            <div class="input-group">
+                                <input type="text" id="new-idea" placeholder="💭 记录你的灵感和想法...">
+                                <button id="add-idea" class="btn-primary">+ 添加</button>
+                            </div>
+                        </div>
+                    </section>
+                </div>
+                <div id="plan-modal" class="modal hidden" aria-hidden="true">
+                    <div class="modal-content plan-modal-content" role="dialog" aria-modal="true" aria-labelledby="plan-modal-title">
+                        <div class="modal-header">
+                            <div class="modal-title">
+                                <span class="modal-icon">📝</span>
+                                <div class="modal-heading">
+                                    <h2 id="plan-modal-title">添加年度规划</h2>
+                                    <p id="plan-modal-description">合理拆解年度方向，使用 100 积分规划最重要的事情。</p>
+                                </div>
+                            </div>
+                            <button type="button" class="close-button" id="plan-modal-close" aria-label="关闭">&times;</button>
+                        </div>
+                        <form id="plan-form">
+                            <div class="modal-body plan-modal-body">
+                                <label class="modal-label" for="plan-title">规划名称</label>
+                                <input type="text" id="plan-title" placeholder="例如：2026 成长驱动计划" required>
+
+                                <label class="modal-label" for="plan-description">规划描述</label>
+                                <textarea id="plan-description" rows="3" placeholder="补充规划背景或衡量指标（可选）"></textarea>
+
+                                <label class="modal-label" for="plan-year">规划年份</label>
+                                <select id="plan-year" class="plan-year-select" aria-label="规划年份">
+                                    <option value="">请选择年份</option>
+                                </select>
+
+                                <div class="plan-score-summary">
+                                    <div class="modal-field">
+                                        <label class="modal-label">规划总分</label>
+                                        <div id="plan-total-value" class="plan-total-value">0 分</div>
+                                    </div>
+                                    <div class="modal-field plan-remaining-hint">
+                                        <label class="modal-label">剩余可用</label>
+                                        <span id="plan-modal-remaining" class="plan-modal-remaining">剩余 100 分</span>
+                                    </div>
+                                </div>
+
+                                <div class="plan-goal-section">
+                                    <div class="plan-goals-header">
+                                        <div>
+                                            <h3>目标列表</h3>
+                                            <p>至少添加一个目标，后续可在执行面板中跟踪状态。</p>
+                                        </div>
+                                        <button type="button" class="btn-secondary goal-add-btn" id="add-goal-row">+ 添加目标</button>
+                                    </div>
+                                    <div id="plan-goals-container" class="plan-goals-container"></div>
+                                    <p class="goal-hint">提示：为每个目标分配合理分值，可按季度/主题拆解并填入预计时间。</p>
+                                </div>
+
+                                <div id="plan-modal-error" class="plan-modal-error" role="alert"></div>
+                            </div>
+                            <div class="modal-actions plan-modal-actions">
+                                <button type="button" class="btn-secondary" id="plan-modal-cancel">取消</button>
+                                <button type="submit" class="btn-primary" id="plan-submit-button">保存规划</button>
+                            </div>
+                        </form>
                     </div>
                 </div>
+                <template id="plan-goal-row-template">
+                    <div class="goal-row" data-goal-row>
+                        <div class="goal-row-grid">
+                            <div class="modal-field">
+                                <label class="modal-label">目标名称</label>
+                                <input type="text" class="goal-name" placeholder="例如：完成 OKR KR1">
+                            </div>
+                            <div class="modal-field">
+                                <label class="modal-label">预计时间</label>
+                                <input type="text" class="goal-timeframe" placeholder="Q1 / 3 月 / 暑期">
+                            </div>
+                            <div class="modal-field goal-score-field">
+                                <label class="modal-label">目标分值</label>
+                                <input type="number" class="goal-score" placeholder="例如 10" min="1" max="100">
+                            </div>
+                        </div>
+                        <div class="modal-field">
+                            <label class="modal-label">目标详情</label>
+                            <textarea class="goal-details" rows="2" placeholder="补充说明（可选）"></textarea>
+                        </div>
+                        <button type="button" class="goal-remove-btn" data-remove-goal>删除目标</button>
+                    </div>
+                </template>
             </div>
             
             <!-- 日常管理页面 -->
-            <div id="page-daily" class="page-content">
+            <div id="page-daily" class="page-content active">
                 <div class="glass-card">
                     <div class="section-header">
                         <h2><span class="icon">📅</span> 日程管理</h2>
@@ -184,6 +301,7 @@
         </main>
     </div>
     <script src="js/event-manager.js"></script>
+    <script src="js/plans-api.js"></script>
     <script src="js/main.js"></script>
     <script src="js/calendar.js"></script>
     <script>
