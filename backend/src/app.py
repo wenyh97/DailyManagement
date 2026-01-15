@@ -677,23 +677,34 @@ def register_routes(app: Flask) -> None:  # 定义路由注册函数以保持结
 
     # 事件类型管理 API
     @app.route("/event-types", methods=["GET"])
+    @jwt_required()
     def list_event_types():
+        current_user_id = int(get_jwt_identity())
         session = SessionLocal()
         try:
-            types = session.query(EventType).all()
+            types = (
+                session
+                .query(EventType)
+                .filter(EventType.user_id == current_user_id)
+                .order_by(EventType.name.asc())
+                .all()
+            )
             return jsonify([event_type_to_dict(t) for t in types]), 200
         finally:
             session.close()
 
     @app.route("/event-types", methods=["POST"])
+    @jwt_required()
     def create_event_type():
+        current_user_id = int(get_jwt_identity())
         payload = request.get_json(force=True)
         session = SessionLocal()
         try:
             event_type = EventType(
                 id=uuid4().hex,
                 name=payload.get("name", "新类型"),
-                color=payload.get("color", "#000000")
+                color=payload.get("color", "#000000"),
+                user_id=current_user_id
             )
             session.add(event_type)
             session.commit()
@@ -705,11 +716,18 @@ def register_routes(app: Flask) -> None:  # 定义路由注册函数以保持结
             session.close()
 
     @app.route("/event-types/<type_id>", methods=["PUT"])
+    @jwt_required()
     def update_event_type(type_id: str):
+        current_user_id = int(get_jwt_identity())
         payload = request.get_json(force=True)
         session = SessionLocal()
         try:
-            event_type = session.query(EventType).filter(EventType.id == type_id).first()
+            event_type = (
+                session
+                .query(EventType)
+                .filter(EventType.id == type_id, EventType.user_id == current_user_id)
+                .first()
+            )
             if not event_type:
                 return jsonify({"error": "类型不存在"}), 404
             if "name" in payload:
@@ -722,10 +740,17 @@ def register_routes(app: Flask) -> None:  # 定义路由注册函数以保持结
             session.close()
 
     @app.route("/event-types/<type_id>", methods=["DELETE"])
+    @jwt_required()
     def delete_event_type(type_id: str):
+        current_user_id = int(get_jwt_identity())
         session = SessionLocal()
         try:
-            event_type = session.query(EventType).filter(EventType.id == type_id).first()
+            event_type = (
+                session
+                .query(EventType)
+                .filter(EventType.id == type_id, EventType.user_id == current_user_id)
+                .first()
+            )
             if not event_type:
                 return jsonify({"error": "类型不存在"}), 404
             session.delete(event_type)
