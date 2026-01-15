@@ -312,6 +312,7 @@ def register_routes(app: Flask) -> None:  # 定义路由注册函数以保持结
                     remark_value = None
             # 检查是否为重复事件
             is_repeat = payload.get("isRepeat", False)
+            logging.info(f"[创建事件] isRepeat={is_repeat}, repeatType={payload.get('repeatType')}, repeatEndDate={payload.get('repeatEndDate')}")
             
             if is_repeat:
                 # 构建基础事件数据
@@ -337,6 +338,7 @@ def register_routes(app: Flask) -> None:  # 定义路由注册函数以保持结
                 
                 # 生成重复事件
                 events = generate_repeat_events(base_event_data, repeat_type, repeat_end_date)
+                logging.info(f"[生成重复事件] 生成了 {len(events)} 个事件")
                 for event in events:
                     event.user_id = current_user_id
                     session.add(event)

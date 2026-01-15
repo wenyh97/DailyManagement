@@ -828,6 +828,7 @@
                 payload.isRepeat = true;
                 payload.repeatType = repeatType;
                 payload.repeatEndDate = repeatEndDate;
+                console.log('[EventManager] 创建重复事件:', { repeatType, repeatEndDate });
             } else {
                 payload.isRepeat = false;
             }
