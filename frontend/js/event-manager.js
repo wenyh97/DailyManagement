@@ -638,9 +638,9 @@
                     const message = await response.text();
                     throw new Error(message || '保存事件失败');
                 }
-                this.closeModal();
                 this.onEventsChanged();
                 document.dispatchEvent(new CustomEvent('events:changed'));
+                this.closeModal();
             } catch (error) {
                 console.error('[EventManager] 保存事件失败:', error);
                 alert(error.message || '保存事件失败，请检查填写内容');
