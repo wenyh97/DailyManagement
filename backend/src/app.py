@@ -122,7 +122,6 @@ def register_routes(app: Flask) -> None:  # 定义路由注册函数以保持结
             return jsonify({"error": "Username and password are required"}), 400
             
         session = SessionLocal()
-            original_date = event.start.date() if event.start else None
         try:
             if session.query(User).filter_by(username=username).first():
                 return jsonify({"error": "Username already exists"}), 400
