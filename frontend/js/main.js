@@ -1095,21 +1095,21 @@ document.addEventListener('DOMContentLoaded', () => { // 监听页面加载完�
         if (!['todo', 'doing', 'done'].includes(columnKey)) return;
         
         const taskMeta = getExecutionTaskMeta(draggedTaskCard.planId, draggedTaskCard.goalId, draggedTaskCard.taskId);
-        const previousStatus = draggedTaskCard.previousStatus;
+        const taskRef = { ...draggedTaskCard };
         if (columnKey === 'doing') {
             // 先弹窗，只有成功才移动
             openTaskEventModal(
                 taskMeta,
                 () => {
                     // 事件创建成功，移动任务
-                    setTaskStatus(draggedTaskCard.planId, draggedTaskCard.goalId, draggedTaskCard.taskId, columnKey);
+                    setTaskStatus(taskRef.planId, taskRef.goalId, taskRef.taskId, columnKey);
                 },
                 () => {
                     // 事件创建取消，不做任何变动
                 }
             );
         } else {
-            setTaskStatus(draggedTaskCard.planId, draggedTaskCard.goalId, draggedTaskCard.taskId, columnKey);
+            setTaskStatus(taskRef.planId, taskRef.goalId, taskRef.taskId, columnKey);
         }
         
         draggedTaskCard = null;
