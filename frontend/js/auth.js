@@ -1,4 +1,31 @@
-const API_BASE_URL = 'http://localhost:5000';
+const API_BASE_URL = (() => {
+    if (typeof window !== 'undefined') {
+        const override = window.API_BASE_URL_OVERRIDE || window.API_BASE_URL;
+        if (override && typeof override === 'string') {
+            return override.replace(/\/$/, '');
+        }
+
+        const { protocol, hostname, port } = window.location;
+        const isLocalHost = hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '';
+        if (protocol === 'file:' || isLocalHost) {
+            return 'http://127.0.0.1:5000';
+        }
+        const portSegment = port ? `:${port}` : '';
+        return `${protocol}//${hostname}${portSegment}`.replace(/\/$/, '');
+    }
+    return 'http://127.0.0.1:5000';
+})();
+
+if (typeof window !== 'undefined') {
+    window.API_BASE_URL = API_BASE_URL;
+}
+
+function buildApiUrl(endpoint) {
+    if (!endpoint.startsWith('/')) {
+        return `${API_BASE_URL}/${endpoint}`;
+    }
+    return `${API_BASE_URL}${endpoint}`;
+}
 
 function getToken() {
     return localStorage.getItem('access_token');
@@ -41,7 +68,8 @@ async function apiRequest(endpoint, method = 'GET', body = null) {
     }
 
     try {
-        const response = await fetch(`${API_BASE_URL}${endpoint}`, options);
+        const url = buildApiUrl(endpoint);
+        const response = await fetch(url, options);
         
         if (response.status === 401 || response.status === 422) {
             // Token expired, invalid, or unprocessable
