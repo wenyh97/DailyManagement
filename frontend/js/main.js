@@ -46,6 +46,13 @@ document.addEventListener('DOMContentLoaded', () => { // 监听页面加载完�
     let planningDataLoaded = false;
     const defaultPlanYear = new Date().getFullYear();
 
+    const normalizeId = (value) => {
+        if (value === null || value === undefined) {
+            return '';
+        }
+        return String(value);
+    };
+
     const buildPlanYearOptions = (focusYear = defaultPlanYear) => {
         if (!planYearSelect) return;
         const now = new Date().getFullYear();
@@ -81,7 +88,7 @@ document.addEventListener('DOMContentLoaded', () => { // 监听页面加载完�
 
     const EXECUTION_QUEUE_STORAGE_KEY = 'dailyManagement.goalExecutionQueue';
 
-    const queueKey = (planId, goalId) => `${planId || ''}::${goalId || ''}`;
+    const queueKey = (planId, goalId) => `${normalizeId(planId)}::${normalizeId(goalId)}`;
 
     const loadExecutionQueue = () => {
         if (typeof localStorage === 'undefined') {
@@ -95,8 +102,15 @@ document.addEventListener('DOMContentLoaded', () => { // 监听页面加载完�
                 return [];
             }
             return parsed
-                .map((entry) => ({ planId: entry.planId, goalId: entry.goalId }))
-                .filter((entry) => entry.planId && entry.goalId);
+                .map((entry) => {
+                    const planId = normalizeId(entry.planId);
+                    const goalId = normalizeId(entry.goalId);
+                    if (!planId || !goalId) {
+                        return null;
+                    }
+                    return { planId, goalId };
+                })
+                .filter(Boolean);
         } catch (error) {
             console.warn('[Planning] Failed to parse execution queue from storage:', error);
             return [];
@@ -104,13 +118,23 @@ document.addEventListener('DOMContentLoaded', () => { // 监听页面加载完�
     };
 
     const persistExecutionQueue = (nextQueue) => {
-        goalExecutionQueue = nextQueue;
-        goalExecutionQueueSet = new Set(nextQueue.map((entry) => queueKey(entry.planId, entry.goalId)));
+        const normalizedQueue = nextQueue
+            .map((entry) => {
+                const planId = normalizeId(entry.planId);
+                const goalId = normalizeId(entry.goalId);
+                if (!planId || !goalId) {
+                    return null;
+                }
+                return { planId, goalId };
+            })
+            .filter(Boolean);
+        goalExecutionQueue = normalizedQueue;
+        goalExecutionQueueSet = new Set(normalizedQueue.map((entry) => queueKey(entry.planId, entry.goalId)));
         if (typeof localStorage === 'undefined') {
             return;
         }
         try {
-            localStorage.setItem(EXECUTION_QUEUE_STORAGE_KEY, JSON.stringify(nextQueue));
+            localStorage.setItem(EXECUTION_QUEUE_STORAGE_KEY, JSON.stringify(normalizedQueue));
         } catch (error) {
             console.warn('[Planning] Failed to persist execution queue:', error);
         }
@@ -129,9 +153,11 @@ document.addEventListener('DOMContentLoaded', () => { // 监听页面加载完�
     };
 
     const addGoalToExecutionQueue = (planId, goalId) => {
-        if (!planId || !goalId) return false;
-        if (isGoalQueued(planId, goalId)) return false;
-        const nextQueue = [...goalExecutionQueue, { planId, goalId }];
+        const normalizedPlanId = normalizeId(planId);
+        const normalizedGoalId = normalizeId(goalId);
+        if (!normalizedPlanId || !normalizedGoalId) return false;
+        if (isGoalQueued(normalizedPlanId, normalizedGoalId)) return false;
+        const nextQueue = [...goalExecutionQueue, { planId: normalizedPlanId, goalId: normalizedGoalId }];
         persistExecutionQueue(nextQueue);
         renderPlanAccordion(planDataCache);
         renderGoalExecutionBoard(planDataCache);
@@ -139,9 +165,11 @@ document.addEventListener('DOMContentLoaded', () => { // 监听页面加载完�
     };
 
     const removeGoalFromExecutionQueue = (planId, goalId) => {
-        if (!planId || !goalId) return false;
-        if (!isGoalQueued(planId, goalId)) return false;
-        const nextQueue = goalExecutionQueue.filter((entry) => entry.planId !== planId || entry.goalId !== goalId);
+        const normalizedPlanId = normalizeId(planId);
+        const normalizedGoalId = normalizeId(goalId);
+        if (!normalizedPlanId || !normalizedGoalId) return false;
+        if (!isGoalQueued(normalizedPlanId, normalizedGoalId)) return false;
+        const nextQueue = goalExecutionQueue.filter((entry) => entry.planId !== normalizedPlanId || entry.goalId !== normalizedGoalId);
         persistExecutionQueue(nextQueue);
         renderPlanAccordion(planDataCache);
         renderGoalExecutionBoard(planDataCache);
@@ -153,7 +181,7 @@ document.addEventListener('DOMContentLoaded', () => { // 监听页面加载完�
 
     const normalizeTaskStatus = (value) => (allowedTaskStatuses.includes(value) ? value : 'backlog');
 
-    const taskKey = (planId, goalId, taskId) => `${planId || ''}::${goalId || ''}::${taskId || ''}`;
+    const taskKey = (planId, goalId, taskId) => `${normalizeId(planId)}::${normalizeId(goalId)}::${normalizeId(taskId)}`;
 
     const loadTaskStatusMap = () => {
         if (typeof localStorage === 'undefined') {
@@ -186,9 +214,12 @@ document.addEventListener('DOMContentLoaded', () => { // 监听页面加载完�
     const getTaskStatus = (planId, goalId, taskId) => normalizeTaskStatus(goalTaskStatusMap[taskKey(planId, goalId, taskId)]);
 
     const setTaskStatus = (planId, goalId, taskId, status) => {
-        if (!planId || !goalId || !taskId) return false;
+        const normalizedPlanId = normalizeId(planId);
+        const normalizedGoalId = normalizeId(goalId);
+        const normalizedTaskId = normalizeId(taskId);
+        if (!normalizedPlanId || !normalizedGoalId || !normalizedTaskId) return false;
         const normalizedStatus = normalizeTaskStatus(status);
-        const key = taskKey(planId, goalId, taskId);
+        const key = taskKey(normalizedPlanId, normalizedGoalId, normalizedTaskId);
         const previous = normalizeTaskStatus(goalTaskStatusMap[key]);
         if (previous === normalizedStatus) {
             return false;
@@ -197,7 +228,7 @@ document.addEventListener('DOMContentLoaded', () => { // 监听页面加载完�
         persistTaskStatusMap();
         
         // 更新目标和规划的状态
-        updateGoalAndPlanStatus(planId, goalId);
+        updateGoalAndPlanStatus(normalizedPlanId, normalizedGoalId);
         
         renderGoalExecutionBoard(planDataCache);
         return true;
@@ -552,7 +583,7 @@ document.addEventListener('DOMContentLoaded', () => { // 监听页面加载完�
         try {
             const payload = await window.plansApi.reorderGoals(planId, orderedIds);
             if (payload?.plan) {
-                const index = planDataCache.findIndex((plan) => plan.id === planId);
+                const index = planDataCache.findIndex((plan) => normalizeId(plan.id) === normalizeId(planId));
                 if (index >= 0) {
                     planDataCache.splice(index, 1, payload.plan);
                 } else {
@@ -697,12 +728,14 @@ document.addEventListener('DOMContentLoaded', () => { // 监听页面加载完�
 
     // 计算目标的状态：根据其任务的状态
     const calculateGoalStatus = (planId, goalId, goalDetails) => {
+        const normalizedPlanId = normalizeId(planId);
+        const normalizedGoalId = normalizeId(goalId);
         const tasks = extractGoalTasks(goalDetails);
         if (!tasks.length) return 'pending';
         
         const taskStatuses = tasks.map((task, index) => {
-            const taskId = `${goalId || 'goal'}-${index}`;
-            return getTaskStatus(planId, goalId, taskId);
+            const taskId = `${normalizedGoalId || 'goal'}-${index}`;
+            return getTaskStatus(normalizedPlanId, normalizedGoalId, taskId);
         });
         
         // 所有任务都完成
@@ -759,14 +792,18 @@ document.addEventListener('DOMContentLoaded', () => { // 监听页面加载完�
 
     // 更新目标和规划的状态
     const updateGoalAndPlanStatus = async (planId, goalId) => {
-        const plan = planDataCache.find(p => p.id === planId);
+        const normalizedPlanId = normalizeId(planId);
+        const normalizedGoalId = normalizeId(goalId);
+        if (!normalizedPlanId || !normalizedGoalId) return;
+
+        const plan = planDataCache.find((p) => normalizeId(p.id) === normalizedPlanId);
         if (!plan || !plan.goals) return;
         
-        const goal = plan.goals.find(g => g.id === goalId);
+        const goal = plan.goals.find((g) => normalizeId(g.id) === normalizedGoalId);
         if (!goal) return;
         
         // 计算新的目标状态
-        const newGoalStatus = calculateGoalStatus(planId, goalId, goal.details);
+        const newGoalStatus = calculateGoalStatus(plan.id, goal.id, goal.details);
         const goalStatusChanged = goal.status !== newGoalStatus;
         
         if (goalStatusChanged) {
@@ -798,7 +835,7 @@ document.addEventListener('DOMContentLoaded', () => { // 监听页面加载完�
                     status: newPlanStatus  // 使用映射后的状态值
                 };
                 
-                await apiRequest(`/api/plans/${planId}`, 'PUT', payload);
+                await apiRequest(`/api/plans/${plan.id}`, 'PUT', payload);
                 
                 // 更新缓存
                 const index = planDataCache.findIndex(p => p.id === planId);
@@ -832,7 +869,7 @@ document.addEventListener('DOMContentLoaded', () => { // 监听页面加载完�
             return emptyState;
         }
 
-        const planMap = new Map(plans.map((plan) => [plan.id, plan]));
+        const planMap = new Map(plans.map((plan) => [normalizeId(plan.id), plan]));
         const cards = [];
         const tasksByStatus = {
             backlog: [],
@@ -845,24 +882,31 @@ document.addEventListener('DOMContentLoaded', () => { // 监听页面加载完�
         const taskMetaEntries = [];
 
         goalExecutionQueue.forEach((entry) => {
-            const plan = planMap.get(entry.planId);
+            const entryPlanId = normalizeId(entry.planId);
+            const entryGoalId = normalizeId(entry.goalId);
+            if (!entryPlanId || !entryGoalId) {
+                return;
+            }
+            const plan = planMap.get(entryPlanId);
             if (!plan || !Array.isArray(plan.goals)) {
                 return;
             }
-            const goal = plan.goals.find((candidate) => candidate.id === entry.goalId);
+            const goal = plan.goals.find((candidate) => normalizeId(candidate.id) === entryGoalId);
             if (!goal) {
                 return;
             }
-            validEntries.push(entry);
+            const normalizedPlanId = normalizeId(plan.id);
+            const normalizedGoalId = normalizeId(goal.id);
+            validEntries.push({ planId: normalizedPlanId, goalId: normalizedGoalId });
             const taskMetas = extractGoalTasks(goal.details).map((content, index) => {
-                const taskId = `${goal.id || 'goal'}-${index}`;
-                const key = taskKey(plan.id, goal.id, taskId);
+                const taskId = `${normalizedGoalId || 'goal'}-${index}`;
+                const key = taskKey(normalizedPlanId, normalizedGoalId, taskId);
                 validTaskKeys.add(key);
-                const status = getTaskStatus(plan.id, goal.id, taskId);
+                const status = getTaskStatus(normalizedPlanId, normalizedGoalId, taskId);
                 const meta = {
-                    planId: plan.id,
+                    planId: normalizedPlanId,
                     planTitle: plan.title || '未命名规划',
-                    goalId: goal.id,
+                    goalId: normalizedGoalId,
                     goalName: goal.name || '未命名目标',
                     taskId,
                     content,
@@ -881,9 +925,9 @@ document.addEventListener('DOMContentLoaded', () => { // 监听页面加载完�
             }
 
             cards.push({
-                planId: plan.id,
+                planId: normalizedPlanId,
                 planTitle: plan.title || '未命名规划',
-                goalId: goal.id,
+                goalId: normalizedGoalId,
                 name: goal.name || '未命名目标',
                 timeframe: goal.expected_timeframe,
                 score: goal.score_allocation || 0,
@@ -1240,8 +1284,9 @@ document.addEventListener('DOMContentLoaded', () => { // 监听页面加载完�
     }
 
     const findPlanById = (planId) => {
-        if (!planId) return null;
-        return planDataCache.find((plan) => plan.id === planId) || null;
+        const normalizedPlanId = normalizeId(planId);
+        if (!normalizedPlanId) return null;
+        return planDataCache.find((plan) => normalizeId(plan.id) === normalizedPlanId) || null;
     };
 
     const handlePlanEdit = (planId) => {
@@ -1603,9 +1648,9 @@ document.addEventListener('DOMContentLoaded', () => { // 监听页面加载完�
                     // 如果是编辑模式，直接从缓存保留原有状态
                     // 不要重新计算，因为任务ID可能因details改变而变化
                     if (editingMode && editingPlanId) {
-                        const existingPlan = planDataCache.find(p => p.id === editingPlanId);
+                        const existingPlan = planDataCache.find((p) => normalizeId(p.id) === normalizeId(editingPlanId));
                         if (existingPlan && existingPlan.goals) {
-                            const existingGoal = existingPlan.goals.find(g => g.id === goalId);
+                            const existingGoal = existingPlan.goals.find((g) => normalizeId(g.id) === normalizeId(goalId));
                             if (existingGoal && existingGoal.status) {
                                 goal.status = existingGoal.status;
                             }
@@ -1654,7 +1699,7 @@ document.addEventListener('DOMContentLoaded', () => { // 监听页面加载完�
                 
                 if (result?.plan) {
                     if (editingMode) {
-                        const targetIndex = planDataCache.findIndex((planItem) => planItem.id === editingPlanId);
+                        const targetIndex = planDataCache.findIndex((planItem) => normalizeId(planItem.id) === normalizeId(editingPlanId));
                         if (targetIndex >= 0) {
                             planDataCache.splice(targetIndex, 1, result.plan);
                         } else {
@@ -1737,11 +1782,11 @@ document.addEventListener('DOMContentLoaded', () => { // 监听页面加载完�
             }
             
             const statusText = planStatusLabels[plan.status] || plan.status || '草稿';
-            const planIdAttr = plan.id || '';
+            const planIdAttr = normalizeId(plan.id);
             const planYearChip = plan.year ? `<span class="plan-year-chip">${plan.year} 年</span>` : '';
             const goalsHtml = goals.length
                 ? `<div class="plan-goal-list" data-plan-id="${planIdAttr}">${goals.map((goal) => {
-                        const goalIdAttr = goal.id || '';
+                        const goalIdAttr = normalizeId(goal.id);
                         const queued = planIdAttr && goalIdAttr ? isGoalQueued(planIdAttr, goalIdAttr) : false;
                         const canQueue = Boolean(planIdAttr && goalIdAttr);
                         const executeLabel = queued ? '已追踪' : (canQueue ? '追踪' : '保存后追踪');
