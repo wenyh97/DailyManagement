@@ -327,7 +327,10 @@ def register_routes(app: Flask) -> None:  # 定义路由注册函数以保持结
                     "custom_type_id": payload.get("customTypeId")
                 }
                 
-                repeat_type = payload.get("repeatType")
+                repeat_type = payload.get("repeatType") or "daily"
+                allowed_repeat_types = {"daily", "weekday", "weekend", "workday", "holiday"}
+                if repeat_type not in allowed_repeat_types:
+                    return jsonify({"error": "重复类型无效"}), 400
                 repeat_end_date = None
                 if payload.get("repeatEndDate"):
                     repeat_end_date = datetime.fromisoformat(payload.get("repeatEndDate")).date()
