@@ -122,6 +122,7 @@ def register_routes(app: Flask) -> None:  # 定义路由注册函数以保持结
             return jsonify({"error": "Username and password are required"}), 400
             
         session = SessionLocal()
+            original_date = event.start.date() if event.start else None
         try:
             if session.query(User).filter_by(username=username).first():
                 return jsonify({"error": "Username already exists"}), 400
@@ -382,44 +383,130 @@ def register_routes(app: Flask) -> None:  # 定义路由注册函数以保持结
             event = session.query(Event).filter(Event.id == event_id, Event.user_id == current_user_id).first()
             if not event:
                 return jsonify({"error": "事件不存在"}), 404
-            original_date = event.start.date() if event.start else None
-            
-            # 更新事件字段
-            if "title" in payload:
-                event.title = payload["title"]
-            if "start" in payload:
-                event.start = datetime.fromisoformat(payload["start"])
-            if "end" in payload:
-                event.end = datetime.fromisoformat(payload["end"])
-            if "allDay" in payload:
-                event.allDay = payload["allDay"]
-                # 如果变成全天事件，清除 time 字段
-                if event.allDay:
-                    event.time = None
-            if "category" in payload:
-                event.category = payload["category"]
-            if "time" in payload:
-                event.time = payload["time"]
-            if "urgency" in payload:
-                event.urgency = payload["urgency"]
-            if "remark" in payload:
-                remark_value = payload["remark"]
-                if isinstance(remark_value, str):
-                    remark_value = remark_value.strip()
-                    if not remark_value:
-                        remark_value = None
-                event.remark = remark_value
-            if "customTypeId" in payload:
-                event.custom_type_id = payload["customTypeId"]
-            session.flush()
 
-            if event.is_completed:
-                if original_date and event.start and event.start.date() != original_date:
-                    recalculate_daily_score_for_date(session, original_date, current_user_id)
+            allowed_repeat_types = {"daily", "weekday", "weekend", "workday", "holiday"}
+
+            def normalize_remark(value):
+                if isinstance(value, str):
+                    trimmed = value.strip()
+                    return trimmed or None
+                return value
+
+            def parse_datetime(value, fallback):
+                if value in (None, ""):
+                    return fallback
+                return datetime.fromisoformat(value)
+
+            def parse_repeat_end(value):
+                if value in (None, ""):
+                    return None
+                return datetime.fromisoformat(value).date()
+
+            updated_title = payload.get("title", event.title)
+            updated_start = parse_datetime(payload.get("start"), event.start)
+            updated_end = parse_datetime(payload.get("end"), event.end)
+            updated_all_day = payload.get("allDay", event.allDay)
+            updated_category = payload.get("category", event.category)
+            updated_time = payload.get("time", event.time or "")
+            updated_urgency = payload.get("urgency", event.urgency)
+            remark_supplied = "remark" in payload
+            updated_remark = normalize_remark(payload.get("remark")) if remark_supplied else event.remark
+            updated_custom_type_id = payload.get("customTypeId", event.custom_type_id)
+            completion_supplied = "isCompleted" in payload
+            efficiency_supplied = "efficiency" in payload
+
+            has_repeat_flag = "isRepeat" in payload
+            requested_repeat_flag = bool(payload["isRepeat"]) if has_repeat_flag else event.is_repeat
+            repeat_type_raw = payload.get("repeatType")
+            requested_repeat_type = (repeat_type_raw or event.repeat_type or "daily")
+            if requested_repeat_flag and requested_repeat_type not in allowed_repeat_types:
+                return jsonify({"error": "重复类型无效"}), 400
+            repeat_end_supplied = "repeatEndDate" in payload
+            requested_repeat_end = parse_repeat_end(payload.get("repeatEndDate")) if repeat_end_supplied else event.repeat_end_date
+
+            if requested_repeat_flag and not event.is_repeat:
+                base_event_data = {
+                    "title": updated_title,
+                    "start": updated_start,
+                    "end": updated_end,
+                    "allDay": updated_all_day,
+                    "category": updated_category,
+                    "time": '' if updated_all_day else (updated_time or ''),
+                    "urgency": updated_urgency,
+                    "remark": updated_remark,
+                    "custom_type_id": updated_custom_type_id
+                }
+                repeat_group_id = uuid4().hex
+                events = generate_repeat_events(
+                    base_event_data,
+                    requested_repeat_type,
+                    requested_repeat_end,
+                    repeat_group_id=repeat_group_id
+                )
+                session.delete(event)
+                session.flush()
+                for generated in events:
+                    generated.user_id = current_user_id
+                    session.add(generated)
+                session.commit()
+                clear_stats_cache()
+                return jsonify({
+                    "message": f"成功转换为重复事件，共 {len(events)} 次",
+                    "count": len(events),
+                    "events": [event_to_dict(e) for e in events[:10]],
+                    "repeatGroupId": repeat_group_id
+                }), 200
+
+            original_date = event.start.date() if event.start else None
+
+            event.title = updated_title
+            event.start = updated_start
+            event.end = updated_end
+            event.allDay = updated_all_day
+            event.category = updated_category
+            event.time = None if updated_all_day else (updated_time or '')
+            event.urgency = updated_urgency
+            if remark_supplied:
+                event.remark = updated_remark
+            event.custom_type_id = updated_custom_type_id
+            if completion_supplied:
+                event.is_completed = payload["isCompleted"]
+            if efficiency_supplied:
+                event.efficiency = payload["efficiency"]
+
+            if has_repeat_flag:
+                if payload["isRepeat"]:
+                    event.is_repeat = True
+                    event.repeat_type = requested_repeat_type
+                    if repeat_end_supplied:
+                        event.repeat_end_date = requested_repeat_end
+                    if not event.repeat_group_id:
+                        event.repeat_group_id = uuid4().hex
+                else:
+                    if event.is_repeat and event.repeat_group_id:
+                        session.query(Event).filter(
+                            Event.repeat_group_id == event.repeat_group_id,
+                            Event.user_id == current_user_id,
+                            Event.id != event.id
+                        ).delete(synchronize_session=False)
+                    event.is_repeat = False
+                    event.repeat_type = None
+                    event.repeat_end_date = None
+                    event.repeat_group_id = None
+            else:
+                if event.is_repeat:
+                    event.repeat_type = requested_repeat_type
+                    if repeat_end_supplied:
+                        event.repeat_end_date = requested_repeat_end
+
+            if event.start and original_date and event.start.date() != original_date:
+                calculate_and_update_daily_score(session, event, current_user_id)
+                recalculate_daily_score_for_date(session, original_date, current_user_id)
+            else:
                 calculate_and_update_daily_score(session, event, current_user_id)
 
             session.commit()
-            clear_stats_cache()  # 清除统计缓存
+            clear_stats_cache()
             return jsonify(event_to_dict(event)), 200
         finally:
             session.close()
