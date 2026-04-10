@@ -194,7 +194,14 @@
                 if (response.ok) {
                     loadUsers();
                 } else {
-                    alert('删除失败');
+                    let message = '删除失败';
+                    try {
+                        const err = await response.json();
+                        message = err.error || message;
+                    } catch (error) {
+                        // Keep fallback message when response body is unavailable.
+                    }
+                    alert(message);
                 }
             }
         }

@@ -52,6 +52,10 @@
                         <span class="nav-icon">📊</span>
                         <span>数据统计</span>
                     </button>
+                    <button class="nav-btn" id="nav-manage" data-page="manage" style="display:none;">
+                        <span class="nav-icon">🛠️</span>
+                        <span>系统管理</span>
+                    </button>
                 </nav>
                 
                 <!-- 右侧：用户信息与服务健康 -->
@@ -314,14 +318,15 @@
             const user = getUser();
             if (user) {
                 document.getElementById('user-display-name').textContent = user.username;
+                const manageBtn = document.getElementById('nav-manage');
                 
                 if (user.is_admin) {
                     const adminSection = document.getElementById('admin-section');
+                    if (manageBtn) manageBtn.style.display = 'inline-flex';
                     if (adminSection) adminSection.style.display = 'block';
                 } else {
                     // Hide Manage Tab for non-admins if required by "普通用户无权查看管理"
                     // If "管理" means the whole tab:
-                    const manageBtn = document.getElementById('nav-manage');
                     if (manageBtn) manageBtn.style.display = 'none';
                 }
             }

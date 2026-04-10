@@ -294,10 +294,39 @@ def register_routes(app: Flask) -> None:  # 定义路由注册函数以保持结
             user = session.query(User).get(user_id)
             if not user:
                 return jsonify({"error": "User not found"}), 404
+
+            deleted_counts = {
+                "goal_task_statuses": session.query(GoalTaskStatus)
+                .filter(GoalTaskStatus.user_id == user_id)
+                .delete(synchronize_session=False),
+                "goal_execution_queue": session.query(GoalExecutionQueue)
+                .filter(GoalExecutionQueue.user_id == user_id)
+                .delete(synchronize_session=False),
+                "events": session.query(Event)
+                .filter(Event.user_id == user_id)
+                .delete(synchronize_session=False),
+                "ideas": session.query(Idea)
+                .filter(Idea.user_id == user_id)
+                .delete(synchronize_session=False),
+                "daily_scores": session.query(DailyScore)
+                .filter(DailyScore.user_id == user_id)
+                .delete(synchronize_session=False),
+                "annual_plans": session.query(AnnualPlan)
+                .filter(AnnualPlan.user_id == user_id)
+                .delete(synchronize_session=False),
+                "event_types": session.query(EventType)
+                .filter(EventType.user_id == user_id)
+                .delete(synchronize_session=False),
+            }
                 
             session.delete(user)
             session.commit()
-            return jsonify({"message": "User deleted"}), 200
+            clear_stats_cache()
+            return jsonify({"message": "User deleted", "deleted_counts": deleted_counts}), 200
+        except IntegrityError as exc:
+            session.rollback()
+            logging.exception("Delete user failed because of integrity constraint: %s", exc)
+            return jsonify({"error": "该用户仍被其他数据引用，无法删除"}), 409
         except Exception as e:
             session.rollback()
             raise e
