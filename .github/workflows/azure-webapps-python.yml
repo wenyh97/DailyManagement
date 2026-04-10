@@ -10,6 +10,14 @@ env:
 on:
   push:
     branches: [ "main" ]  # 当推送到 main 分支时触发工作流
+    paths:
+      - "backend/**"
+      - "frontend/**"
+      - "docker-compose.yml"
+      - "Dockerfile"
+      - "Caddyfile"
+      - "nginx.conf"
+      - ".github/workflows/azure-webapps-python.yml"
   workflow_dispatch:  # 允许手动触发工作流
 
 permissions:

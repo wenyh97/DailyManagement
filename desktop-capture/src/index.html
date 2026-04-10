@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TonyBase Capture</title>
+    <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+    <div class="app-shell">
+        <header class="hero">
+            <p class="eyebrow">Desktop Capture</p>
+            <h1>TonyBase Capture</h1>
+            <p class="hero-copy">按 Ctrl+Shift+Space 呼出，记一句就收起。</p>
+        </header>
+
+        <main class="panel-stack">
+            <section class="panel" id="login-panel">
+                <div class="panel-heading">
+                    <div>
+                        <p class="section-label">账号登录</p>
+                        <h2>连接你的 DailyManagement</h2>
+                    </div>
+                    <button class="ghost-button" id="toggle-settings-button" type="button">服务地址</button>
+                </div>
+
+                <form id="login-form" class="form-stack">
+                    <label class="field">
+                        <span>服务地址</span>
+                        <input id="api-base-input" name="apiBase" type="url" placeholder="https://dailymanagement.tonybase.site" required>
+                    </label>
+                    <label class="field">
+                        <span>用户名</span>
+                        <input id="username-input" name="username" type="text" autocomplete="username" required>
+                    </label>
+                    <label class="field">
+                        <span>密码</span>
+                        <input id="password-input" name="password" type="password" autocomplete="current-password" required>
+                    </label>
+                    <button class="primary-button" id="login-button" type="submit">登录并开始记录</button>
+                    <p class="helper-text" id="login-status">首次启动需要登录一次。</p>
+                </form>
+            </section>
+
+            <section class="panel hidden" id="capture-panel">
+                <div class="panel-heading compact">
+                    <div>
+                        <p class="section-label">快速记录</p>
+                        <h2 id="welcome-text">已连接</h2>
+                    </div>
+                    <div class="header-actions">
+                        <button class="ghost-button" id="refresh-button" type="button">刷新</button>
+                        <button class="ghost-button danger" id="logout-button" type="button">退出</button>
+                    </div>
+                </div>
+
+                <form id="capture-form" class="form-stack capture-form">
+                    <label class="field">
+                        <span>灵感内容</span>
+                        <textarea id="idea-input" name="idea" rows="4" placeholder="写下一句想法，按 Ctrl+Enter 直接提交。" required></textarea>
+                    </label>
+                    <div class="row-actions">
+                        <button class="secondary-button" id="clear-button" type="button">清空</button>
+                        <button class="primary-button" id="submit-button" type="submit">提交</button>
+                    </div>
+                    <p class="helper-text" id="capture-status">准备就绪。</p>
+                </form>
+
+                <section class="history-panel">
+                    <div class="panel-heading compact history-heading">
+                        <div>
+                            <p class="section-label">最近记录</p>
+                            <h3>刚刚收进来的内容</h3>
+                        </div>
+                    </div>
+                    <ul class="history-list" id="recent-list">
+                        <li class="empty-state">登录后加载最近记录。</li>
+                    </ul>
+                </section>
+            </section>
+        </main>
+    </div>
+
+    <script type="module" src="./main.js"></script>
+</body>
+</html>

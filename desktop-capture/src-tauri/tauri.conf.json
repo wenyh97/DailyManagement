@@ -1,0 +1,46 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "TonyBase Capture",
+  "version": "0.1.0",
+  "identifier": "site.tonybase.capture",
+  "build": {
+    "beforeDevCommand": "npm run dev",
+    "devUrl": "http://127.0.0.1:1420",
+    "beforeBuildCommand": "npm run build",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "withGlobalTauri": false,
+    "windows": [
+      {
+        "label": "main",
+        "title": "TonyBase Capture",
+        "width": 460,
+        "height": 640,
+        "resizable": false,
+        "fullscreen": false,
+        "maximizable": false,
+        "minimizable": true,
+        "decorations": true,
+        "alwaysOnTop": true,
+        "center": true,
+        "visible": true
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": [
+      "nsis"
+    ],
+    "windows": {
+      "nsis": {
+        "displayLanguageSelector": false,
+        "installerIcon": null
+      }
+    }
+  }
+}

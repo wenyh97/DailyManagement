@@ -54,6 +54,20 @@
         .links {
             text-align: center;
             margin-top: 1rem;
+            display: flex;
+            justify-content: center;
+            gap: 0.75rem;
+            flex-wrap: wrap;
+        }
+        .link-button {
+            display: inline-block;
+            padding: 0.65rem 1rem;
+            border-radius: 999px;
+            text-decoration: none;
+            font-weight: 600;
+            border: 1px solid #d7dce5;
+            color: #334155;
+            background: #f8fafc;
         }
         .error-message {
             color: red;
@@ -79,7 +93,8 @@
             <button type="submit" class="btn">登录</button>
         </form>
         <div class="links">
-            <a id="register-link" href="register.html">没有账号？去注册</a>
+            <a id="register-link" class="link-button" href="register.html">没有账号？去注册</a>
+            <a class="link-button" href="downloads.html">下载桌面版</a>
         </div>
     </div>
 
