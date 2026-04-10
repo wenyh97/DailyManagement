@@ -3,11 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-    <title>快速记录</title>
+    <title>灵感收集</title>
     <meta name="theme-color" content="#0f766e">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="apple-mobile-web-app-title" content="快速记录">
+    <meta name="apple-mobile-web-app-title" content="灵感收集">
     <link rel="manifest" href="manifest.webmanifest">
     <link rel="icon" href="icons/capture-icon.svg" type="image/svg+xml">
     <link rel="stylesheet" href="css/capture.css">
@@ -22,40 +22,25 @@
             <header class="capture-header">
                 <div>
                     <p class="capture-kicker">Daily Management</p>
-                    <h1>快速记录</h1>
-                    <p class="capture-subtitle">想到一句就记一句，分类放到后面再做。</p>
+                    <h1>灵感收集</h1>
+                    <p class="capture-subtitle">先把灵感记下来，以后再做细分。</p>
                 </div>
-                <button type="button" class="ghost-button" id="logout-button">退出</button>
             </header>
 
-            <div class="capture-meta">
-                <span class="status-chip" id="network-status">检测网络中</span>
-                <span class="status-chip muted" id="sync-status">准备就绪</span>
-            </div>
-
-            <section class="install-panel" id="install-panel" hidden>
-                <div>
-                    <h2>安装到手机桌面</h2>
-                    <p id="install-description">安装后可像 App 一样从桌面直接打开。</p>
-                </div>
-                <button type="button" class="primary-button install-button" id="install-button" hidden>安装应用</button>
-            </section>
-
             <form id="capture-form" class="capture-form">
-                <label class="capture-label" for="capture-input">这会儿想记什么？</label>
                 <textarea
                     id="capture-input"
                     class="capture-input"
-                    rows="5"
+                    rows="3"
                     maxlength="256"
-                    placeholder="例如：周四和小李确认需求；给孩子买画笔；想试试新的晨间流程"
+                    placeholder="写一句就行，比如：周四和小李确认需求"
                     autofocus
                 ></textarea>
                 <div class="capture-actions">
                     <button type="button" class="secondary-button" id="clear-draft-button">清空草稿</button>
                     <button type="submit" class="primary-button" id="submit-button">立即记录</button>
                 </div>
-                <p class="capture-help" id="capture-help">已登录后可直接记录。断网时会先保存到本机，恢复网络后自动补发。</p>
+                <p class="capture-help" id="capture-help">一条就一句，清晰更明确</p>
             </form>
 
             <section class="capture-panel" id="queued-panel" hidden>
@@ -68,13 +53,21 @@
 
             <section class="capture-panel">
                 <div class="panel-header">
-                    <h2>最近记录</h2>
+                    <h2>刚刚记下</h2>
                     <button type="button" class="link-button" id="refresh-button">刷新</button>
                 </div>
                 <ul class="capture-list" id="recent-list">
-                    <li class="empty-state">正在加载最近记录...</li>
+                    <li class="empty-state">正在加载刚刚记下的内容...</li>
                 </ul>
             </section>
+
+            <footer class="capture-footer">
+                <div class="capture-meta capture-meta-footer">
+                    <span class="status-chip" id="network-status">检测网络中</span>
+                    <span class="status-chip muted" id="sync-status">准备就绪</span>
+                </div>
+                <button type="button" class="ghost-button capture-footer-button" id="logout-button">退出</button>
+            </footer>
         </section>
     </main>
 

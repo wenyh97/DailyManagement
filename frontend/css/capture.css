@@ -29,7 +29,7 @@ body {
 
 .capture-shell {
     min-height: 100vh;
-    padding: 20px 16px 32px;
+    padding: 14px 12px 24px;
 }
 
 .capture-card {
@@ -38,9 +38,9 @@ body {
     background: var(--card);
     backdrop-filter: blur(18px);
     border: 1px solid rgba(255, 255, 255, 0.35);
-    border-radius: 28px;
+    border-radius: 24px;
     box-shadow: var(--shadow);
-    padding: 20px;
+    padding: 16px;
 }
 
 .capture-header {
@@ -51,9 +51,9 @@ body {
 }
 
 .capture-kicker {
-    margin: 0 0 8px;
+    margin: 0 0 6px;
     color: var(--accent);
-    font-size: 12px;
+    font-size: 11px;
     font-weight: 700;
     letter-spacing: 0.08em;
     text-transform: uppercase;
@@ -61,14 +61,15 @@ body {
 
 .capture-header h1 {
     margin: 0;
-    font-size: 32px;
+    font-size: 28px;
     line-height: 1.1;
 }
 
 .capture-subtitle {
-    margin: 10px 0 0;
+    margin: 6px 0 0;
     color: var(--muted);
-    line-height: 1.6;
+    line-height: 1.5;
+    font-size: 14px;
 }
 
 .capture-meta {
@@ -76,34 +77,6 @@ body {
     flex-wrap: wrap;
     gap: 8px;
     margin: 18px 0 20px;
-}
-
-.install-panel {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    gap: 16px;
-    margin-bottom: 18px;
-    padding: 14px 16px;
-    border-radius: 20px;
-    background: rgba(240, 253, 250, 0.92);
-    border: 1px solid rgba(15, 118, 110, 0.12);
-}
-
-.install-panel h2 {
-    margin: 0;
-    font-size: 15px;
-}
-
-.install-panel p {
-    margin: 6px 0 0;
-    color: var(--muted);
-    font-size: 13px;
-    line-height: 1.6;
-}
-
-.install-button {
-    flex-shrink: 0;
 }
 
 .status-chip {
@@ -130,7 +103,8 @@ body {
 
 .capture-form {
     display: grid;
-    gap: 12px;
+    gap: 10px;
+    margin-top: 14px;
 }
 
 .capture-label {
@@ -141,10 +115,11 @@ body {
 .capture-input {
     width: 100%;
     border: 1px solid var(--border);
-    border-radius: 20px;
-    padding: 16px 18px;
+    border-radius: 18px;
+    padding: 12px 14px;
     resize: vertical;
-    min-height: 144px;
+    min-height: 92px;
+    max-height: 148px;
     font: inherit;
     color: inherit;
     background: rgba(255, 255, 255, 0.9);
@@ -206,14 +181,32 @@ body {
 .capture-help {
     margin: 0;
     color: var(--muted);
-    font-size: 13px;
-    line-height: 1.6;
+    font-size: 12px;
+    line-height: 1.5;
 }
 
 .capture-panel {
-    margin-top: 22px;
+    margin-top: 18px;
     border-top: 1px solid rgba(148, 163, 184, 0.18);
+    padding-top: 14px;
+}
+
+.capture-footer {
+    margin-top: 24px;
     padding-top: 18px;
+    border-top: 1px solid rgba(148, 163, 184, 0.18);
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    align-items: center;
+}
+
+.capture-meta-footer {
+    margin: 0;
+}
+
+.capture-footer-button {
+    min-width: 88px;
 }
 
 .panel-header {
@@ -221,12 +214,12 @@ body {
     justify-content: space-between;
     gap: 12px;
     align-items: center;
-    margin-bottom: 12px;
+    margin-bottom: 10px;
 }
 
 .panel-header h2 {
     margin: 0;
-    font-size: 16px;
+    font-size: 15px;
 }
 
 .capture-list {
@@ -234,28 +227,35 @@ body {
     margin: 0;
     padding: 0;
     display: grid;
-    gap: 10px;
+    gap: 8px;
 }
 
 .capture-item,
 .empty-state {
-    border-radius: 18px;
+    border-radius: 16px;
     background: rgba(248, 250, 252, 0.9);
     border: 1px solid rgba(148, 163, 184, 0.14);
-    padding: 14px 16px;
+    padding: 12px 14px;
 }
 
 .capture-item p,
 .empty-state {
     margin: 0;
-    line-height: 1.6;
+    line-height: 1.5;
+    font-size: 14px;
 }
 
 .capture-item time {
     display: block;
-    margin-top: 8px;
+    margin-top: 6px;
     color: var(--muted);
     font-size: 12px;
+}
+
+#recent-list {
+    max-height: 46vh;
+    overflow-y: auto;
+    padding-right: 2px;
 }
 
 .capture-item.pending {
@@ -265,12 +265,12 @@ body {
 
 @media (max-width: 520px) {
     .capture-shell {
-        padding: 12px 12px 24px;
+        padding: 10px 10px 20px;
     }
 
     .capture-card {
-        border-radius: 24px;
-        padding: 16px;
+        border-radius: 20px;
+        padding: 14px;
     }
 
     .capture-header {
@@ -278,16 +278,20 @@ body {
     }
 
     .capture-header h1 {
-        font-size: 28px;
+        font-size: 24px;
     }
 
     .capture-actions {
         flex-direction: column-reverse;
     }
 
-    .install-panel {
+    .capture-footer {
         flex-direction: column;
         align-items: stretch;
+    }
+
+    #recent-list {
+        max-height: 50vh;
     }
 
     .primary-button,
