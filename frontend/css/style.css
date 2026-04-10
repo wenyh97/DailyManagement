@@ -1321,33 +1321,6 @@ select.urgency-fallback::-ms-expand { display:none; }
     flex: 1;
 }
 
-.idea-priority {
-    padding: 2px 8px;
-    border-radius: 10px;
-    font-size: 0.7em;
-    font-weight: 600;
-    white-space: nowrap;
-    flex-shrink: 0;
-}
-
-.idea-priority.high {
-    background: linear-gradient(135deg, #f5576c 0%, #ff6b81 100%);
-    color: white;
-    box-shadow: 0 2px 8px rgba(245, 87, 108, 0.3);
-}
-
-.idea-priority.medium {
-    background: linear-gradient(135deg, #ed8936 0%, #f6ad55 100%);
-    color: white;
-    box-shadow: 0 2px 8px rgba(237, 137, 54, 0.3);
-}
-
-.idea-priority.low {
-    background: linear-gradient(135deg, #a0aec0 0%, #cbd5e0 100%);
-    color: white;
-    box-shadow: 0 2px 8px rgba(160, 174, 192, 0.3);
-}
-
 .idea-meta {
     display: flex;
     align-items: center;

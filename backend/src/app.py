@@ -1004,7 +1004,6 @@ def register_routes(app: Flask) -> None:  # 定义路由注册函数以保持结
             idea = Idea(
                 id=uuid4().hex,
                 text=payload.get("text", "新的灵感"),
-                priority=payload.get("priority", "medium"),
                 createdAt=datetime.utcnow(),
                 user_id=current_user_id
             )
@@ -1027,10 +1026,6 @@ def register_routes(app: Flask) -> None:  # 定义路由注册函数以保持结
             
             if "text" in payload:
                 idea.text = payload["text"]
-            if "priority" in payload:
-                if payload["priority"] not in ["high", "medium", "low"]:
-                    return jsonify({"error": "优先级必须为 high/medium/low"}), 400
-                idea.priority = payload["priority"]
             
             session.commit()
             return jsonify(idea_to_dict(idea)), 200

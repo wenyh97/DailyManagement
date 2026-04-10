@@ -43,6 +43,7 @@ def init_db() -> None:
     Base.metadata.create_all(bind=engine)
     _ensure_event_table_columns()
     _ensure_user_id_columns()
+    _cleanup_legacy_idea_columns()
 
 
 def _ensure_user_id_columns() -> None:
@@ -60,6 +61,19 @@ def _ensure_user_id_columns() -> None:
                 connection.execute(text(f"ALTER TABLE {table} ADD COLUMN user_id INT NULL"))
                 connection.execute(text(f"ALTER TABLE {table} ADD CONSTRAINT fk_{table}_user FOREIGN KEY (user_id) REFERENCES users(id)"))
                 # Data migration will be handled in seed_demo_data after admin user is ensured
+
+def _cleanup_legacy_idea_columns() -> None:
+    """Remove deprecated columns from ideas table after schema simplification."""
+    inspector = inspect(engine)
+    if 'ideas' not in inspector.get_table_names():
+        return
+
+    existing_columns = {column['name'] for column in inspector.get_columns('ideas')}
+    if 'priority' not in existing_columns:
+        return
+
+    with engine.begin() as connection:
+        connection.execute(text('ALTER TABLE ideas DROP COLUMN priority'))
 
 def _ensure_event_table_columns() -> None:
     """Add newly introduced columns on existing databases without manual migrations."""

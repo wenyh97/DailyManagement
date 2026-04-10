@@ -27,7 +27,6 @@ def idea_to_dict(idea):
     return {
         "id": idea.id,
         "text": idea.text,
-        "priority": idea.priority if hasattr(idea, 'priority') else 'medium',
         "createdAt": idea.createdAt.isoformat() + "Z" if idea.createdAt else None,
     }
 

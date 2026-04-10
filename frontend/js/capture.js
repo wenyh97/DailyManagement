@@ -164,7 +164,7 @@
     }
 
     async function sendIdea(text) {
-        const response = await apiRequest('/ideas', 'POST', { text, priority: 'medium' });
+        const response = await apiRequest('/ideas', 'POST', { text });
         if (!response.ok) {
             let message = '记录失败';
             try {
