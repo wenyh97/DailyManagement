@@ -57,6 +57,17 @@
         }
     }
 
+    function formatShortTime(value) {
+        try {
+            return new Date(value).toLocaleTimeString('zh-CN', {
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+        } catch (error) {
+            return '--:--';
+        }
+    }
+
     function renderQueue() {
         const queue = loadQueue();
         queuedCount.textContent = `${queue.length} 条`;
@@ -69,8 +80,11 @@
 
         queuedList.innerHTML = queue.map((item) => `
             <li class="capture-item pending">
-                <p>${escapeHtml(item.text)}</p>
-                <time>待同步 · ${formatTime(item.createdAt)}</time>
+                <span class="capture-time">${formatShortTime(item.createdAt)}</span>
+                <div class="capture-body">
+                    <p>${escapeHtml(item.text)}</p>
+                    <time>待同步 · ${formatTime(item.createdAt)}</time>
+                </div>
             </li>
         `).join('');
     }
@@ -83,8 +97,11 @@
 
         recentList.innerHTML = ideas.slice(0, MAX_RECENT_ITEMS).map((item) => `
             <li class="capture-item">
-                <p>${escapeHtml(item.text || '')}</p>
-                <time>${formatTime(item.createdAt || item.created_at || '')}</time>
+                <span class="capture-time">${formatShortTime(item.createdAt || item.created_at || '')}</span>
+                <div class="capture-body">
+                    <p>${escapeHtml(item.text || '')}</p>
+                    <time>${formatTime(item.createdAt || item.created_at || '')}</time>
+                </div>
             </li>
         `).join('');
     }
@@ -106,7 +123,7 @@
 
     function setSyncMessage(message, isMuted = false) {
         syncStatus.textContent = message;
-        syncStatus.classList.toggle('muted', isMuted);
+        syncStatus.classList.toggle('is-muted', isMuted);
     }
 
     async function fetchRecentIdeas() {
