@@ -78,6 +78,34 @@ body {
     margin: 18px 0 20px;
 }
 
+.install-panel {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 18px;
+    padding: 14px 16px;
+    border-radius: 20px;
+    background: rgba(240, 253, 250, 0.92);
+    border: 1px solid rgba(15, 118, 110, 0.12);
+}
+
+.install-panel h2 {
+    margin: 0;
+    font-size: 15px;
+}
+
+.install-panel p {
+    margin: 6px 0 0;
+    color: var(--muted);
+    font-size: 13px;
+    line-height: 1.6;
+}
+
+.install-button {
+    flex-shrink: 0;
+}
+
 .status-chip {
     display: inline-flex;
     align-items: center;
@@ -255,6 +283,11 @@ body {
 
     .capture-actions {
         flex-direction: column-reverse;
+    }
+
+    .install-panel {
+        flex-direction: column;
+        align-items: stretch;
     }
 
     .primary-button,

@@ -16,6 +16,11 @@
     const networkStatus = document.getElementById('network-status');
     const syncStatus = document.getElementById('sync-status');
     const captureHelp = document.getElementById('capture-help');
+    const installPanel = document.getElementById('install-panel');
+    const installButton = document.getElementById('install-button');
+    const installDescription = document.getElementById('install-description');
+
+    let deferredInstallPrompt = null;
 
     function saveDraft(value) {
         localStorage.setItem(DRAFT_STORAGE_KEY, value);
@@ -107,6 +112,40 @@
     function setSyncMessage(message, isMuted = false) {
         syncStatus.textContent = message;
         syncStatus.classList.toggle('muted', isMuted);
+    }
+
+    function isStandaloneMode() {
+        return window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+    }
+
+    function isAndroidLikeDevice() {
+        return /Android/i.test(window.navigator.userAgent || '');
+    }
+
+    function updateInstallPanel() {
+        if (!installPanel || !installDescription || !installButton) {
+            return;
+        }
+
+        if (isStandaloneMode()) {
+            installPanel.hidden = false;
+            installButton.hidden = true;
+            installDescription.textContent = '当前已经以应用方式打开，可以直接从桌面继续使用。';
+            return;
+        }
+
+        installPanel.hidden = false;
+
+        if (deferredInstallPrompt) {
+            installButton.hidden = false;
+            installDescription.textContent = '建议安装到桌面，后续可像 App 一样一键打开。';
+            return;
+        }
+
+        installButton.hidden = true;
+        installDescription.textContent = isAndroidLikeDevice()
+            ? '如果没有看到安装按钮，可在浏览器菜单中选择“添加到主屏幕”或“安装应用”。'
+            : '当前浏览器未暴露安装按钮，可尝试通过浏览器菜单将页面添加到主屏幕。';
     }
 
     async function fetchRecentIdeas() {
@@ -236,6 +275,23 @@
         }
     }
 
+    async function handleInstallClick() {
+        if (!deferredInstallPrompt) {
+            updateInstallPanel();
+            return;
+        }
+
+        deferredInstallPrompt.prompt();
+        const result = await deferredInstallPrompt.userChoice;
+        deferredInstallPrompt = null;
+
+        if (result && result.outcome === 'accepted') {
+            captureHelp.textContent = '安装请求已接受，完成后可从手机桌面直接打开。';
+        }
+
+        updateInstallPanel();
+    }
+
     form.addEventListener('submit', handleSubmit);
     input.addEventListener('input', () => saveDraft(input.value));
     clearDraftButton.addEventListener('click', () => {
@@ -245,6 +301,9 @@
         input.focus();
     });
     logoutButton.addEventListener('click', logout);
+    if (installButton) {
+        installButton.addEventListener('click', handleInstallClick);
+    }
     refreshButton.addEventListener('click', async () => {
         await fetchRecentIdeas();
         await flushQueue();
@@ -254,11 +313,22 @@
         await flushQueue();
     });
     window.addEventListener('offline', setNetworkState);
+    window.addEventListener('beforeinstallprompt', (event) => {
+        event.preventDefault();
+        deferredInstallPrompt = event;
+        updateInstallPanel();
+    });
+    window.addEventListener('appinstalled', () => {
+        deferredInstallPrompt = null;
+        captureHelp.textContent = '已安装到桌面，后续可以像 App 一样直接打开。';
+        updateInstallPanel();
+    });
 
     input.value = loadDraft();
     renderQueue();
     setNetworkState();
     setSyncMessage(loadQueue().length ? '有待同步记录' : '准备就绪', !loadQueue().length);
+    updateInstallPanel();
 
     fetchRecentIdeas();
     flushQueue();
