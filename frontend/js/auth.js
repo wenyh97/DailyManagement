@@ -20,6 +20,47 @@ if (typeof window !== 'undefined') {
     window.API_BASE_URL = API_BASE_URL;
 }
 
+function sanitizeRedirectTarget(target) {
+    if (!target || typeof target !== 'string') {
+        return 'index.html';
+    }
+
+    const trimmed = target.trim();
+    if (!trimmed) {
+        return 'index.html';
+    }
+
+    if (/^[a-zA-Z][a-zA-Z\d+.-]*:/.test(trimmed) || trimmed.startsWith('//')) {
+        return 'index.html';
+    }
+
+    return trimmed;
+}
+
+function getCurrentAppLocation() {
+    if (typeof window === 'undefined') {
+        return 'index.html';
+    }
+
+    const { pathname, search, hash } = window.location;
+    const candidate = `${pathname || '/index.html'}${search || ''}${hash || ''}`;
+    return sanitizeRedirectTarget(candidate);
+}
+
+function getPostLoginRedirectTarget() {
+    if (typeof window === 'undefined') {
+        return 'index.html';
+    }
+
+    const params = new URLSearchParams(window.location.search);
+    return sanitizeRedirectTarget(params.get('redirect') || 'index.html');
+}
+
+function buildAuthPageUrl(pageName, redirectTarget) {
+    const safeRedirect = sanitizeRedirectTarget(redirectTarget || getCurrentAppLocation());
+    return `${pageName}?redirect=${encodeURIComponent(safeRedirect)}`;
+}
+
 function buildApiUrl(endpoint) {
     if (!endpoint.startsWith('/')) {
         return `${API_BASE_URL}/${endpoint}`;
@@ -76,7 +117,7 @@ async function apiRequest(endpoint, method = 'GET', body = null) {
             // Don't redirect if we are already on login page
             if (!window.location.pathname.endsWith('login.html')) {
                 removeToken();
-                window.location.href = 'login.html';
+                window.location.href = buildAuthPageUrl('login.html');
             }
             return response; // Let the caller handle the error if needed
         }
@@ -89,11 +130,16 @@ async function apiRequest(endpoint, method = 'GET', body = null) {
 
 function checkLogin() {
     if (!getToken()) {
-        window.location.href = 'login.html';
+        window.location.href = buildAuthPageUrl('login.html');
     }
 }
 
 function logout() {
     removeToken();
     window.location.href = 'login.html';
+}
+
+if (typeof window !== 'undefined') {
+    window.getPostLoginRedirectTarget = getPostLoginRedirectTarget;
+    window.buildAuthPageUrl = buildAuthPageUrl;
 }

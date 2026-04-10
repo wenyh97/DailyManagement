@@ -90,12 +90,15 @@
             <button type="submit" class="btn">注册</button>
         </form>
         <div class="links">
-            <a href="login.html">已有账号？去登录</a>
+            <a id="login-link" href="login.html">已有账号？去登录</a>
         </div>
     </div>
 
     <script src="js/auth.js"></script>
     <script>
+        const redirectTarget = getPostLoginRedirectTarget();
+        document.getElementById('login-link').href = buildAuthPageUrl('login.html', redirectTarget);
+
         document.getElementById('register-form').addEventListener('submit', async (e) => {
             e.preventDefault();
             const username = document.getElementById('username').value;
@@ -121,7 +124,7 @@
                     successMsg.textContent = '注册成功，正在跳转登录页...';
                     successMsg.style.display = 'block';
                     setTimeout(() => {
-                        window.location.href = 'login.html';
+                        window.location.href = buildAuthPageUrl('login.html', redirectTarget);
                     }, 1500);
                 } else {
                     errorMsg.textContent = data.error || '注册失败';

@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>快速记录</title>
+    <meta name="theme-color" content="#0f766e">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="快速记录">
+    <link rel="manifest" href="manifest.webmanifest">
+    <link rel="icon" href="icons/capture-icon.svg" type="image/svg+xml">
+    <link rel="stylesheet" href="css/capture.css">
+    <script src="js/auth.js"></script>
+    <script>
+        checkLogin();
+    </script>
+</head>
+<body>
+    <main class="capture-shell">
+        <section class="capture-card">
+            <header class="capture-header">
+                <div>
+                    <p class="capture-kicker">Daily Management</p>
+                    <h1>快速记录</h1>
+                    <p class="capture-subtitle">想到一句就记一句，分类放到后面再做。</p>
+                </div>
+                <button type="button" class="ghost-button" id="logout-button">退出</button>
+            </header>
+
+            <div class="capture-meta">
+                <span class="status-chip" id="network-status">检测网络中</span>
+                <span class="status-chip muted" id="sync-status">准备就绪</span>
+            </div>
+
+            <form id="capture-form" class="capture-form">
+                <label class="capture-label" for="capture-input">这会儿想记什么？</label>
+                <textarea
+                    id="capture-input"
+                    class="capture-input"
+                    rows="5"
+                    maxlength="256"
+                    placeholder="例如：周四和小李确认需求；给孩子买画笔；想试试新的晨间流程"
+                    autofocus
+                ></textarea>
+                <div class="capture-actions">
+                    <button type="button" class="secondary-button" id="clear-draft-button">清空草稿</button>
+                    <button type="submit" class="primary-button" id="submit-button">立即记录</button>
+                </div>
+                <p class="capture-help" id="capture-help">已登录后可直接记录。断网时会先保存到本机，恢复网络后自动补发。</p>
+            </form>
+
+            <section class="capture-panel" id="queued-panel" hidden>
+                <div class="panel-header">
+                    <h2>待同步</h2>
+                    <span id="queued-count">0 条</span>
+                </div>
+                <ul class="capture-list" id="queued-list"></ul>
+            </section>
+
+            <section class="capture-panel">
+                <div class="panel-header">
+                    <h2>最近记录</h2>
+                    <button type="button" class="link-button" id="refresh-button">刷新</button>
+                </div>
+                <ul class="capture-list" id="recent-list">
+                    <li class="empty-state">正在加载最近记录...</li>
+                </ul>
+            </section>
+        </section>
+    </main>
+
+    <script src="js/capture.js"></script>
+</body>
+</html>
