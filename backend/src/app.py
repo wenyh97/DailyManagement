@@ -9,6 +9,7 @@ from flask_cors import CORS  # 引入 CORS 以支持跨域请求
 from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity, get_jwt
 from werkzeug.security import generate_password_hash, check_password_hash
 import logging
+from sqlalchemy import case, func, or_
 from sqlalchemy.exc import IntegrityError
 
 from .models.db import init_db, SessionLocal
@@ -16,13 +17,18 @@ from .models.event import Event
 from .models.idea import Idea
 from .models.event_type import EventType
 from .models.daily_score import DailyScore
+from .models.annual_plan import AnnualPlan
+from .models.plan_goal import PlanGoal
+from .models.goal_execution_queue import GoalExecutionQueue
+from .models.goal_task_status import GoalTaskStatus
 from .models.user import User
 from .utils import event_to_dict, idea_to_dict, event_type_to_dict, daily_score_to_dict
 from .services.event_service import (
     generate_repeat_events,
     calculate_and_update_daily_score,
     recalculate_daily_score_for_date,
-    calculate_event_score
+    calculate_event_score,
+    calculate_event_units
 )
 from .services import plan_service
 
@@ -36,6 +42,32 @@ stats_cache = {
 # 全局内存数据存储（后续阶段将替换为 MySQL 持久化）
 EVENTS_STORE: List[Dict[str, str]] = []  # 存放日程事件的临时列表
 IDEAS_STORE: List[Dict[str, str]] = []  # 存放灵感记录的临时列表
+
+DEFAULT_EVENT_TYPES = [
+    {"name": "工作", "color": "#3b82f6"},
+    {"name": "学习", "color": "#10b981"},
+    {"name": "生活", "color": "#f59e0b"},
+    {"name": "娱乐", "color": "#ef4444"},
+    {"name": "运动", "color": "#8b5cf6"}
+]
+
+
+def ensure_global_event_types(session) -> bool:
+    """仅在系统中没有任何全局事件类型时，注入默认类型。"""
+    has_global = session.query(EventType.id).filter(EventType.user_id.is_(None)).first()
+    if has_global:
+        return False
+
+    for item in DEFAULT_EVENT_TYPES:
+        session.add(EventType(
+            id=uuid4().hex,
+            name=item["name"],
+            color=item["color"],
+            user_id=None
+        ))
+
+    session.flush()
+    return True
 
 
 def create_app() -> Flask:  # 创建并配置 Flask 应用的工厂函数
@@ -134,21 +166,7 @@ def register_routes(app: Flask) -> None:  # 定义路由注册函数以保持结
             session.add(user)
             session.flush() # Get user ID
 
-            # Initialize default event types for new user
-            default_types = [
-                {"name": "工作", "color": "#3b82f6"},
-                {"name": "学习", "color": "#10b981"},
-                {"name": "生活", "color": "#f59e0b"},
-                {"name": "娱乐", "color": "#ef4444"},
-                {"name": "运动", "color": "#8b5cf6"}
-            ]
-            for dt in default_types:
-                session.add(EventType(
-                    id=uuid4().hex,
-                    name=dt["name"],
-                    color=dt["color"],
-                    user_id=user.id
-                ))
+            ensure_global_event_types(session)
 
             session.commit()
             return jsonify({"message": "User registered successfully"}), 201
@@ -325,7 +343,10 @@ def register_routes(app: Flask) -> None:  # 定义路由注册函数以保持结
                     "time": payload.get("time", ""),
                     "urgency": payload.get("urgency", "普通"),
                     "remark": remark_value,
-                    "custom_type_id": payload.get("customTypeId")
+                    "custom_type_id": payload.get("customTypeId"),
+                    "plan_id": payload.get("planId"),
+                    "goal_id": payload.get("goalId"),
+                    "task_id": payload.get("taskId")
                 }
                 
                 repeat_type = payload.get("repeatType") or "daily"
@@ -363,6 +384,9 @@ def register_routes(app: Flask) -> None:  # 定义路由注册函数以保持结
                     urgency=payload.get("urgency", "普通"),
                     remark=remark_value,
                     custom_type_id=payload.get("customTypeId"),
+                    plan_id=payload.get("planId"),
+                    goal_id=payload.get("goalId"),
+                    task_id=payload.get("taskId"),
                     user_id=current_user_id
                 )
                 session.add(event)
@@ -411,6 +435,9 @@ def register_routes(app: Flask) -> None:  # 定义路由注册函数以保持结
             remark_supplied = "remark" in payload
             updated_remark = normalize_remark(payload.get("remark")) if remark_supplied else event.remark
             updated_custom_type_id = payload.get("customTypeId", event.custom_type_id)
+            updated_plan_id = payload.get("planId", event.plan_id)
+            updated_goal_id = payload.get("goalId", event.goal_id)
+            updated_task_id = payload.get("taskId", event.task_id)
             completion_supplied = "isCompleted" in payload
             efficiency_supplied = "efficiency" in payload
 
@@ -433,7 +460,10 @@ def register_routes(app: Flask) -> None:  # 定义路由注册函数以保持结
                     "time": '' if updated_all_day else (updated_time or ''),
                     "urgency": updated_urgency,
                     "remark": updated_remark,
-                    "custom_type_id": updated_custom_type_id
+                    "custom_type_id": updated_custom_type_id,
+                    "plan_id": updated_plan_id,
+                    "goal_id": updated_goal_id,
+                    "task_id": updated_task_id
                 }
                 repeat_group_id = uuid4().hex
                 events = generate_repeat_events(
@@ -468,6 +498,9 @@ def register_routes(app: Flask) -> None:  # 定义路由注册函数以保持结
             if remark_supplied:
                 event.remark = updated_remark
             event.custom_type_id = updated_custom_type_id
+            event.plan_id = updated_plan_id
+            event.goal_id = updated_goal_id
+            event.task_id = updated_task_id
             if completion_supplied:
                 event.is_completed = payload["isCompleted"]
             if efficiency_supplied:
@@ -699,6 +732,228 @@ def register_routes(app: Flask) -> None:  # 定义路由注册函数以保持结
             logging.error("Delete plan failed: %s", exc)
             return jsonify({"error": str(exc)}), 400
 
+    def _load_user_goal_pairs(session, user_id: int) -> set:
+        rows = (
+            session.query(PlanGoal.id, PlanGoal.plan_id)
+            .join(AnnualPlan, PlanGoal.plan_id == AnnualPlan.id)
+            .filter(AnnualPlan.user_id == user_id)
+            .all()
+        )
+        return {(row.plan_id, row.id) for row in rows}
+
+    @app.route("/api/goal-execution-queue", methods=["GET", "PUT", "OPTIONS"])
+    def goal_execution_queue_api():
+        if request.method == "OPTIONS":
+            return "", 204
+        from flask_jwt_extended import verify_jwt_in_request
+        verify_jwt_in_request()
+        current_user_id = int(get_jwt_identity())
+        session = SessionLocal()
+        try:
+            if request.method == "GET":
+                items = (
+                    session.query(GoalExecutionQueue)
+                    .filter(GoalExecutionQueue.user_id == current_user_id)
+                    .order_by(GoalExecutionQueue.created_at.asc())
+                    .all()
+                )
+                return jsonify({
+                    "items": [
+                        {"plan_id": item.plan_id, "goal_id": item.goal_id}
+                        for item in items
+                    ]
+                }), 200
+
+            payload = request.get_json(force=True) or {}
+            raw_items = payload.get("items", [])
+            if not isinstance(raw_items, list):
+                return jsonify({"error": "队列数据格式不正确"}), 400
+
+            valid_pairs = _load_user_goal_pairs(session, current_user_id)
+            normalized = []
+            seen = set()
+            for item in raw_items:
+                if not isinstance(item, dict):
+                    continue
+                plan_id = str(item.get("plan_id") or "").strip()
+                goal_id = str(item.get("goal_id") or "").strip()
+                if not plan_id or not goal_id:
+                    continue
+                key = (plan_id, goal_id)
+                if key not in valid_pairs or key in seen:
+                    continue
+                seen.add(key)
+                normalized.append({"plan_id": plan_id, "goal_id": goal_id})
+
+            session.query(GoalExecutionQueue).filter(
+                GoalExecutionQueue.user_id == current_user_id
+            ).delete(synchronize_session=False)
+
+            for entry in normalized:
+                session.add(GoalExecutionQueue(
+                    id=uuid4().hex,
+                    user_id=current_user_id,
+                    plan_id=entry["plan_id"],
+                    goal_id=entry["goal_id"]
+                ))
+
+            session.commit()
+            return jsonify({"items": normalized}), 200
+        finally:
+            session.close()
+
+    @app.route("/api/goal-task-statuses", methods=["GET", "PATCH", "OPTIONS"])
+    def goal_task_statuses_api():
+        if request.method == "OPTIONS":
+            return "", 204
+        from flask_jwt_extended import verify_jwt_in_request
+        verify_jwt_in_request()
+        current_user_id = int(get_jwt_identity())
+        session = SessionLocal()
+        try:
+            if request.method == "GET":
+                items = (
+                    session.query(GoalTaskStatus)
+                    .filter(GoalTaskStatus.user_id == current_user_id)
+                    .all()
+                )
+                return jsonify({
+                    "items": [
+                        {
+                            "plan_id": item.plan_id,
+                            "goal_id": item.goal_id,
+                            "task_id": item.task_id,
+                            "status": item.status
+                        }
+                        for item in items
+                    ]
+                }), 200
+
+            payload = request.get_json(force=True) or {}
+            plan_id = str(payload.get("plan_id") or "").strip()
+            goal_id = str(payload.get("goal_id") or "").strip()
+            task_id = str(payload.get("task_id") or "").strip()
+            status = str(payload.get("status") or "").strip()
+            allowed_status = {"backlog", "todo", "doing", "done"}
+
+            if not plan_id or not goal_id or not task_id:
+                return jsonify({"error": "缺少任务标识"}), 400
+            if status not in allowed_status:
+                return jsonify({"error": "任务状态不合法"}), 400
+
+            valid_pairs = _load_user_goal_pairs(session, current_user_id)
+            if (plan_id, goal_id) not in valid_pairs:
+                return jsonify({"error": "目标不存在或无权访问"}), 404
+
+            existing = (
+                session.query(GoalTaskStatus)
+                .filter(
+                    GoalTaskStatus.user_id == current_user_id,
+                    GoalTaskStatus.plan_id == plan_id,
+                    GoalTaskStatus.goal_id == goal_id,
+                    GoalTaskStatus.task_id == task_id
+                )
+                .first()
+            )
+            if existing:
+                existing.status = status
+            else:
+                session.add(GoalTaskStatus(
+                    id=uuid4().hex,
+                    user_id=current_user_id,
+                    plan_id=plan_id,
+                    goal_id=goal_id,
+                    task_id=task_id,
+                    status=status
+                ))
+
+            session.commit()
+            return jsonify({
+                "plan_id": plan_id,
+                "goal_id": goal_id,
+                "task_id": task_id,
+                "status": status
+            }), 200
+        finally:
+            session.close()
+
+    @app.route("/api/task-progress", methods=["GET", "OPTIONS"])
+    def task_progress_api():
+        if request.method == "OPTIONS":
+            return "", 204
+        from flask_jwt_extended import verify_jwt_in_request
+        verify_jwt_in_request()
+        current_user_id = int(get_jwt_identity())
+        session = SessionLocal()
+        try:
+            rows = (
+                session.query(
+                    Event.plan_id,
+                    Event.goal_id,
+                    Event.task_id,
+                    func.count(Event.id).label("total"),
+                    func.sum(case((Event.is_completed == True, 1), else_=0)).label("completed")
+                )
+                .filter(
+                    Event.user_id == current_user_id,
+                    Event.task_id.isnot(None)
+                )
+                .group_by(Event.plan_id, Event.goal_id, Event.task_id)
+                .all()
+            )
+
+            items = [
+                {
+                    "plan_id": row.plan_id,
+                    "goal_id": row.goal_id,
+                    "task_id": row.task_id,
+                    "total": int(row.total or 0),
+                    "completed": int(row.completed or 0)
+                }
+                for row in rows
+            ]
+            return jsonify({"items": items}), 200
+        finally:
+            session.close()
+
+    @app.route("/api/task-events/reset", methods=["DELETE", "OPTIONS"])
+    def reset_task_events_api():
+        if request.method == "OPTIONS":
+            return "", 204
+        from flask_jwt_extended import verify_jwt_in_request
+        verify_jwt_in_request()
+        current_user_id = int(get_jwt_identity())
+        payload = request.get_json(force=True) or {}
+        plan_id = str(payload.get("plan_id") or "").strip()
+        goal_id = str(payload.get("goal_id") or "").strip()
+        task_id = str(payload.get("task_id") or "").strip()
+
+        if not plan_id or not goal_id or not task_id:
+            return jsonify({"error": "缺少任务标识"}), 400
+
+        session = SessionLocal()
+        try:
+            valid_pairs = _load_user_goal_pairs(session, current_user_id)
+            if (plan_id, goal_id) not in valid_pairs:
+                return jsonify({"error": "目标不存在或无权访问"}), 404
+
+            deleted = (
+                session.query(Event)
+                .filter(
+                    Event.user_id == current_user_id,
+                    Event.plan_id == plan_id,
+                    Event.goal_id == goal_id,
+                    Event.task_id == task_id,
+                    Event.is_completed == True
+                )
+                .delete(synchronize_session=False)
+            )
+            session.commit()
+            clear_stats_cache()
+            return jsonify({"deleted": int(deleted or 0)}), 200
+        finally:
+            session.close()
+
     @app.route("/ideas", methods=["GET"])
     @jwt_required()
     def list_ideas():
@@ -771,16 +1026,59 @@ def register_routes(app: Flask) -> None:  # 定义路由注册函数以保持结
     @jwt_required()
     def list_event_types():
         current_user_id = int(get_jwt_identity())
+        claims = get_jwt()
+        is_admin = bool(claims.get("is_admin"))
         session = SessionLocal()
         try:
-            types = (
+            global_types = (
                 session
                 .query(EventType)
-                .filter(EventType.user_id == current_user_id)
+                .filter(EventType.user_id.is_(None))
                 .order_by(EventType.name.asc())
                 .all()
             )
-            return jsonify([event_type_to_dict(t) for t in types]), 200
+
+            types: List[EventType] = list(global_types)
+
+            if not is_admin:
+                user_types = (
+                    session
+                    .query(EventType)
+                    .filter(EventType.user_id == current_user_id)
+                    .order_by(EventType.name.asc())
+                    .all()
+                )
+                if global_types:
+                    existing_names = {
+                        (t.name or "").strip().lower() for t in global_types if t.name
+                    }
+                    for item in user_types:
+                        normalized = (item.name or "").strip().lower()
+                        if normalized and normalized in existing_names:
+                            continue
+                        types.append(item)
+                else:
+                    types.extend(user_types)
+            elif not global_types:
+                # 管理员在无全局类型时回退到个人类型列表
+                types = (
+                    session
+                    .query(EventType)
+                    .filter(EventType.user_id == current_user_id)
+                    .order_by(EventType.name.asc())
+                    .all()
+                )
+
+            ordered_unique_types: List[EventType] = []
+            seen_ids = set()
+            for item in types:
+                if item.id in seen_ids:
+                    continue
+                seen_ids.add(item.id)
+                ordered_unique_types.append(item)
+
+            ordered_unique_types.sort(key=lambda t: (t.name or "").lower())
+            return jsonify([event_type_to_dict(t) for t in ordered_unique_types]), 200
         finally:
             session.close()
 
@@ -788,14 +1086,41 @@ def register_routes(app: Flask) -> None:  # 定义路由注册函数以保持结
     @jwt_required()
     def create_event_type():
         current_user_id = int(get_jwt_identity())
+        claims = get_jwt()
+        is_admin = bool(claims.get("is_admin"))
         payload = request.get_json(force=True)
         session = SessionLocal()
         try:
+            name = (payload.get("name") or "新类型").strip()
+            color = (payload.get("color") or "#000000").strip()
+
+            if not name:
+                return jsonify({"error": "事件类型名称不能为空"}), 400
+
+            target_user_id = None if is_admin else current_user_id
+            normalized_name = name.lower()
+
+            global_conflict = session.query(EventType).filter(
+                EventType.user_id.is_(None),
+                func.lower(EventType.name) == normalized_name
+            ).first()
+
+            if global_conflict:
+                return jsonify({"error": "事件类型名称已存在"}), 409
+
+            if target_user_id is not None:
+                user_conflict = session.query(EventType).filter(
+                    EventType.user_id == target_user_id,
+                    func.lower(EventType.name) == normalized_name
+                ).first()
+                if user_conflict:
+                    return jsonify({"error": "事件类型名称已存在"}), 409
+
             event_type = EventType(
                 id=uuid4().hex,
-                name=payload.get("name", "新类型"),
-                color=payload.get("color", "#000000"),
-                user_id=current_user_id
+                name=name,
+                color=color or "#000000",
+                user_id=target_user_id
             )
             session.add(event_type)
             session.commit()
@@ -810,22 +1135,63 @@ def register_routes(app: Flask) -> None:  # 定义路由注册函数以保持结
     @jwt_required()
     def update_event_type(type_id: str):
         current_user_id = int(get_jwt_identity())
+        claims = get_jwt()
+        is_admin = bool(claims.get("is_admin"))
         payload = request.get_json(force=True)
         session = SessionLocal()
         try:
-            event_type = (
-                session
-                .query(EventType)
-                .filter(EventType.id == type_id, EventType.user_id == current_user_id)
-                .first()
-            )
+            query = session.query(EventType).filter(EventType.id == type_id)
+            if not is_admin:
+                query = query.filter(EventType.user_id == current_user_id)
+
+            event_type = query.first()
             if not event_type:
                 return jsonify({"error": "类型不存在"}), 404
+
+            original_name = event_type.name
+
             if "name" in payload:
-                event_type.name = payload["name"]
+                new_name = (payload["name"] or "").strip()
+                if not new_name:
+                    return jsonify({"error": "事件类型名称不能为空"}), 400
+                normalized_name = new_name.lower()
+                if event_type.user_id is None:
+                    conflict = session.query(EventType).filter(
+                        EventType.user_id.is_(None),
+                        func.lower(EventType.name) == normalized_name,
+                        EventType.id != type_id
+                    ).first()
+                else:
+                    conflict = session.query(EventType).filter(
+                        EventType.user_id == event_type.user_id,
+                        func.lower(EventType.name) == normalized_name,
+                        EventType.id != type_id
+                    ).first()
+                if conflict:
+                    return jsonify({"error": "事件类型名称已存在"}), 409
+                event_type.name = new_name
+
             if "color" in payload:
-                event_type.color = payload["color"]
+                new_color = (payload["color"] or "").strip()
+                if new_color:
+                    event_type.color = new_color
+
             session.commit()
+
+            if event_type.user_id is None and original_name:
+                normalized_original = original_name.strip().lower()
+                duplicates = session.query(EventType).filter(
+                    EventType.user_id.isnot(None),
+                    func.lower(EventType.name) == normalized_original
+                ).all()
+                for duplicate in duplicates:
+                    if "name" in payload:
+                        duplicate.name = event_type.name
+                    if "color" in payload and event_type.color:
+                        duplicate.color = event_type.color
+                if duplicates:
+                    session.commit()
+
             return jsonify(event_type_to_dict(event_type)), 200
         finally:
             session.close()
@@ -834,16 +1200,36 @@ def register_routes(app: Flask) -> None:  # 定义路由注册函数以保持结
     @jwt_required()
     def delete_event_type(type_id: str):
         current_user_id = int(get_jwt_identity())
+        claims = get_jwt()
+        is_admin = bool(claims.get("is_admin"))
         session = SessionLocal()
         try:
-            event_type = (
-                session
-                .query(EventType)
-                .filter(EventType.id == type_id, EventType.user_id == current_user_id)
-                .first()
-            )
+            query = session.query(EventType).filter(EventType.id == type_id)
+            if not is_admin:
+                query = query.filter(EventType.user_id == current_user_id)
+
+            event_type = query.first()
             if not event_type:
                 return jsonify({"error": "类型不存在"}), 404
+
+            affected_type_ids = [event_type.id]
+            duplicates = []
+            if is_admin and event_type.user_id is None and event_type.name:
+                normalized_name = event_type.name.strip().lower()
+                if normalized_name:
+                    duplicates = session.query(EventType).filter(
+                        EventType.user_id.isnot(None),
+                        func.lower(EventType.name) == normalized_name
+                    ).all()
+                    affected_type_ids.extend([dup.id for dup in duplicates])
+
+            if affected_type_ids:
+                session.query(Event).filter(Event.custom_type_id.in_(affected_type_ids)).update(
+                    {Event.custom_type_id: None}, synchronize_session=False
+                )
+
+            for duplicate in duplicates:
+                session.delete(duplicate)
             session.delete(event_type)
             session.commit()
             return jsonify({"status": "deleted"}), 200
@@ -852,45 +1238,67 @@ def register_routes(app: Flask) -> None:  # 定义路由注册函数以保持结
 
     # 每日积分查询 API
     @app.route("/daily-scores", methods=["GET"])
+    @jwt_required()
     def get_daily_scores():
         start_date_str = request.args.get("start_date")
         end_date_str = request.args.get("end_date")
-        
+        current_user_id = int(get_jwt_identity())
+
         session = SessionLocal()
         try:
-            query = session.query(DailyScore)
-            
+            query = session.query(DailyScore).filter(DailyScore.user_id == current_user_id)
+
+            start_date = None
+            end_date = None
             if start_date_str:
                 start_date = datetime.fromisoformat(start_date_str).date()
                 query = query.filter(DailyScore.date >= start_date)
-            
+
             if end_date_str:
                 end_date = datetime.fromisoformat(end_date_str).date()
                 query = query.filter(DailyScore.date <= end_date)
-            
+
+            # 若指定了范围，先按事件重新计算该范围内每日积分，修复历史残留/不一致数据
+            if start_date or end_date:
+                if not start_date:
+                    start_date = end_date
+                if not end_date:
+                    end_date = start_date
+
+                cursor = start_date
+                while cursor <= end_date:
+                    recalculate_daily_score_for_date(session, cursor, current_user_id)
+                    cursor += timedelta(days=1)
+                session.flush()
+
             scores = query.order_by(DailyScore.date).all()
             return jsonify([daily_score_to_dict(s) for s in scores]), 200
         finally:
             session.close()
 
     @app.route("/daily-score-details", methods=["GET"])
+    @jwt_required()
     def get_daily_score_details():
         date_str = request.args.get("date")
         if not date_str:
             return jsonify({"error": "缺少日期参数"}), 400
-        
+        current_user_id = int(get_jwt_identity())
+
         session = SessionLocal()
         try:
             target_date = datetime.fromisoformat(date_str).date()
             
             # 1. 获取所有事件类型
-            event_types = session.query(EventType).all()
+            event_types = session.query(EventType).filter(
+                or_(EventType.user_id == current_user_id, EventType.user_id.is_(None))
+            ).all()
             type_map = {t.id: t.name for t in event_types}
             
             # 2. 获取当日所有已完成事件
             from sqlalchemy import and_
             events = session.query(Event).filter(
                 and_(
+                    Event.user_id == current_user_id,
                     Event.is_completed == True,
                     Event.start >= datetime.combine(target_date, datetime.min.time()),
                     Event.start < datetime.combine(target_date + timedelta(days=1), datetime.min.time())
@@ -943,9 +1351,7 @@ def register_routes(app: Flask) -> None:  # 定义路由注册函数以保持结
                 
                 if efficiency in ['high', 'medium', 'low']:
                     score = calculate_event_score(event)
-                    # 计算半小时单位数量
-                    duration_minutes = (event.end - event.start).total_seconds() / 60
-                    units = duration_minutes / 30
+                    units = calculate_event_units(event)
                     
                     target_entry['details'][efficiency]['count'] += units
                     target_entry['details'][efficiency]['score'] += score
@@ -987,10 +1393,11 @@ def register_routes(app: Flask) -> None:  # 定义路由注册函数以保持结
         
         # 检查缓存是否有效
         now = datetime.utcnow()
+        cache_ttl = stats_cache.get('ttl', 60)
         if (cache_key in stats_cache and 
             stats_cache[cache_key].get('data') is not None and 
             stats_cache[cache_key].get('timestamp') is not None and 
-            (now - stats_cache[cache_key]['timestamp']).total_seconds() < stats_cache[cache_key]['ttl']):
+            (now - stats_cache[cache_key]['timestamp']).total_seconds() < cache_ttl):
             logging.info(f"返回缓存的统计数据: {cache_key}")
             return jsonify(stats_cache[cache_key]['data']), 200
         
@@ -1078,7 +1485,14 @@ def register_routes(app: Flask) -> None:  # 定义路由注册函数以保持结
             
             # 获取月度得分明细（仅月度有效）
             daily_scores = []
-            if year and month:
+            if year and month and start_date and end_date:
+                # 先按事件重算当月积分，避免残留/不一致
+                cursor = start_date
+                while cursor <= end_date:
+                    recalculate_daily_score_for_date(session, cursor, current_user_id)
+                    cursor += timedelta(days=1)
+                session.flush()
+
                 scores = score_query.order_by(DailyScore.date).all()
                 for score in scores:
                     daily_scores.append({
@@ -1116,6 +1530,7 @@ def register_routes(app: Flask) -> None:  # 定义路由注册函数以保持结
                 stats_cache[cache_key] = {}
             stats_cache[cache_key]['data'] = stats
             stats_cache[cache_key]['timestamp'] = now
+            stats_cache[cache_key]['ttl'] = stats_cache.get('ttl', 60)
             logging.info(f"统计数据已缓存: {cache_key}")
             
             return jsonify(stats), 200
@@ -1169,30 +1584,38 @@ def seed_demo_data() -> None:  # 定义示例数据填充函数
                 )
                 session.add(admin)
                 session.flush()
-                
-                # Initialize default event types for admin
-                default_types = [
-                    {"name": "工作", "color": "#3b82f6"},
-                    {"name": "学习", "color": "#10b981"},
-                    {"name": "生活", "color": "#f59e0b"},
-                    {"name": "娱乐", "color": "#ef4444"},
-                    {"name": "运动", "color": "#8b5cf6"}
-                ]
-                for dt in default_types:
-                    session.add(EventType(
-                        id=uuid4().hex,
-                        name=dt["name"],
-                        color=dt["color"],
-                        user_id=admin.id
-                    ))
-                    
+                ensure_global_event_types(session)
                 session.commit()
                 logging.info("Created default admin user: admin/admin123")
         
-        # Migrate existing data (user_id is NULL) to admin
+        # 确保默认全局事件类型已生成
+        created_defaults = ensure_global_event_types(session)
+        if created_defaults:
+            session.commit()
+
+        # 将管理员名下的事件类型迁移为全局类型，避免重复维护
+        if admin:
+            migrated = False
+            admin_types = session.query(EventType).filter(EventType.user_id == admin.id).all()
+            for item in admin_types:
+                normalized = (item.name or "").strip().lower()
+                if not normalized:
+                    continue
+                conflict = session.query(EventType).filter(
+                    EventType.user_id.is_(None),
+                    func.lower(EventType.name) == normalized
+                ).first()
+                if conflict:
+                    continue
+                item.user_id = None
+                migrated = True
+            if migrated:
+                session.commit()
+
+        # Migrate现有数据（user_id 为空）到管理员名下（事件类型除外，保持全局）
         if admin:
             from sqlalchemy import text
-            tables = ['events', 'ideas', 'daily_scores', 'event_types']
+            tables = ['events', 'ideas', 'daily_scores']
             for table in tables:
                 # Check if table has user_id column and update
                 # We assume columns exist because init_db ran
@@ -1292,4 +1715,4 @@ app = create_app()  # 创建全局应用实例供 WSGI 使用
 
 
 if __name__ == "__main__":  # 仅在直接运行文件时执行
-    app.run(debug=True)  # 启动开发服务器
+    app.run(debug=True, use_reloader=True)  # 启动开发服务器

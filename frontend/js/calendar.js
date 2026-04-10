@@ -369,7 +369,10 @@ document.addEventListener('DOMContentLoaded', () => {
             isRepeat: props.isRepeat,
             repeatType: props.repeatType,
             repeatEndDate: props.repeatEndDate,
-            remark: props.remark
+            remark: props.remark,
+            planId: props.planId,
+            goalId: props.goalId,
+            taskId: props.taskId
         };
     };
 
@@ -554,9 +557,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 isRepeat: rawEvent.isRepeat,
                 repeatType: rawEvent.repeatType,
                 repeatEndDate: rawEvent.repeatEndDate,
+                repeatGroupId: rawEvent.repeatGroupId,
                 isCompleted: rawEvent.isCompleted,
                 efficiency: rawEvent.efficiency,
-                remark: rawEvent.remark
+                remark: rawEvent.remark,
+                planId: rawEvent.planId,
+                goalId: rawEvent.goalId,
+                taskId: rawEvent.taskId
             }
         };
     };

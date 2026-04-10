@@ -36,21 +36,21 @@
                 
                 <!-- 中间：导航菜单 -->
                 <nav class="header-nav">
-                    <button class="nav-btn" data-page="ideas">
-                        <span class="nav-icon">💡</span>
-                        <span>任务管理</span>
+                    <button class="nav-btn" data-page="planning">
+                        <span class="nav-icon">🧭</span>
+                        <span>规划目标</span>
                     </button>
                     <button class="nav-btn active" data-page="daily">
                         <span class="nav-icon">📅</span>
                         <span>日常管理</span>
                     </button>
+                    <button class="nav-btn" data-page="ideas">
+                        <span class="nav-icon">✨</span>
+                        <span>灵感收集</span>
+                    </button>
                     <button class="nav-btn" data-page="stats">
                         <span class="nav-icon">📊</span>
                         <span>数据统计</span>
-                    </button>
-                    <button class="nav-btn" data-page="manage" id="nav-manage">
-                        <span class="nav-icon">🛠️</span>
-                        <span>管理</span>
                     </button>
                 </nav>
                 
@@ -69,13 +69,12 @@
         </header>
         
         <main>
-            <!-- 任务管理页面（含年度规划） -->
-            <div id="page-ideas" class="page-content">
+            <!-- 规划目标页面（含年度规划） -->
+            <div id="page-planning" class="page-content">
                 <div class="planning-workspace" id="planning-workspace">
                     <div class="planning-tab-buttons" role="tablist" aria-label="规划工作区子页签">
                         <button class="planning-tab-btn active" data-planning-tab="annual" role="tab" aria-selected="true">年度规划</button>
                         <button class="planning-tab-btn" data-planning-tab="execution" role="tab" aria-selected="false">目标执行</button>
-                        <button class="planning-tab-btn" data-planning-tab="tasks" role="tab" aria-selected="false">任务管理</button>
                     </div>
 
                     <section id="planning-panel-annual" class="planning-tab-panel active" data-panel="annual" role="tabpanel">
@@ -83,6 +82,9 @@
                             <div class="section-header planning-header">
                                 <h2><span class="icon">🎯</span> 年度规划</h2>
                                 <div class="planning-actions">
+                                    <select id="planning-year-select" class="planning-year-select" aria-label="规划年份切换">
+                                        <option value="">年份</option>
+                                    </select>
                                     <button type="button" class="btn-primary planning-add-btn" id="open-plan-modal">+ 添加规划</button>
                                 </div>
                             </div>
@@ -91,6 +93,7 @@
                                 <span>正在加载年度规划...</span>
                             </div>
                             <div id="plan-accordion" class="plan-accordion"></div>
+                            <div id="planning-score-summary" class="planning-score-summary"></div>
                         </div>
                     </section>
 
@@ -105,22 +108,6 @@
                         </div>
                     </section>
 
-                    <section id="planning-panel-tasks" class="planning-tab-panel" data-panel="tasks" role="tabpanel">
-                        <div class="glass-card">
-                            <div class="section-header">
-                                <h2><span class="icon">💡</span> 灵感收集站</h2>
-                                <select id="idea-sort" class="idea-sort-select">
-                                    <option value="time">按时间排序</option>
-                                    <option value="priority">按优先级排序</option>
-                                </select>
-                            </div>
-                            <div id="ideas-list" class="ideas-container"></div>
-                            <div class="input-group">
-                                <input type="text" id="new-idea" placeholder="💭 记录你的灵感和想法...">
-                                <button id="add-idea" class="btn-primary">+ 添加</button>
-                            </div>
-                        </div>
-                    </section>
                 </div>
                 <div id="plan-modal" class="modal hidden" aria-hidden="true">
                     <div class="modal-content plan-modal-content" role="dialog" aria-modal="true" aria-labelledby="plan-modal-title">
@@ -202,6 +189,24 @@
                         <button type="button" class="goal-remove-btn" data-remove-goal>删除目标</button>
                     </div>
                 </template>
+            </div>
+
+            <!-- 灵感收集页面 -->
+            <div id="page-ideas" class="page-content">
+                <div class="glass-card">
+                    <div class="section-header">
+                        <h2><span class="icon">💡</span> 灵感收集站</h2>
+                        <select id="idea-sort" class="idea-sort-select">
+                            <option value="time">按时间排序</option>
+                            <option value="priority">按优先级排序</option>
+                        </select>
+                    </div>
+                    <div id="ideas-list" class="ideas-container"></div>
+                    <div class="input-group">
+                        <input type="text" id="new-idea" placeholder="💭 记录你的灵感和想法...">
+                        <button id="add-idea" class="btn-primary">+ 添加</button>
+                    </div>
+                </div>
             </div>
             
             <!-- 日常管理页面 -->

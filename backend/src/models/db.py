@@ -12,6 +12,8 @@ from . import daily_score  # noqa: F401, 导入以注册模型到元数据
 from . import user  # noqa: F401, 导入以注册模型到元数据
 from . import annual_plan  # noqa: F401, 导入以注册模型到元数据
 from . import plan_goal  # noqa: F401, 导入以注册模型到元数据
+from . import goal_execution_queue  # noqa: F401, 导入以注册模型到元数据
+from . import goal_task_status  # noqa: F401, 导入以注册模型到元数据
 
 # 自动加载仓库根目录下的 .env 配置
 load_dotenv(find_dotenv(filename=".env", raise_error_if_not_found=False))
@@ -84,6 +86,12 @@ def _ensure_event_table_columns() -> None:
     if 'custom_type_id' not in existing_columns:
         alter_clauses.append('ADD COLUMN custom_type_id VARCHAR(32) NULL')
         needs_custom_type = True
+    if 'plan_id' not in existing_columns:
+        alter_clauses.append('ADD COLUMN plan_id VARCHAR(32) NULL')
+    if 'goal_id' not in existing_columns:
+        alter_clauses.append('ADD COLUMN goal_id VARCHAR(32) NULL')
+    if 'task_id' not in existing_columns:
+        alter_clauses.append('ADD COLUMN task_id VARCHAR(64) NULL')
 
     if alter_clauses:
         alter_sql = f"ALTER TABLE events {', '.join(alter_clauses)}"

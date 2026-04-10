@@ -14,9 +14,13 @@ def event_to_dict(event):
         "isRepeat": event.is_repeat,
         "repeatType": event.repeat_type,
         "repeatEndDate": event.repeat_end_date.isoformat() if event.repeat_end_date else None,
+        "repeatGroupId": event.repeat_group_id,
         "isCompleted": event.is_completed,
         "efficiency": event.efficiency,
         "customTypeId": event.custom_type_id,
+        "planId": event.plan_id,
+        "goalId": event.goal_id,
+        "taskId": event.task_id,
     }
 
 def idea_to_dict(idea):

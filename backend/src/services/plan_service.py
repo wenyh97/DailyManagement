@@ -223,9 +223,10 @@ def list_plans(user_id: int) -> Dict[str, object]:
             .all()
         )
 
+        current_year = datetime.utcnow().year
         total_allocated = (
             session.query(func.sum(AnnualPlan.score_allocation))
-            .filter(AnnualPlan.user_id == user_id)
+            .filter(AnnualPlan.user_id == user_id, AnnualPlan.plan_year == current_year)
             .scalar()
         ) or 0
 
@@ -248,7 +249,7 @@ def create_plan(user_id: int, payload: Dict[str, object]) -> Dict[str, object]:
     with plan_session(commit_on_success=True) as session:
         locked_plans = (
             session.query(AnnualPlan)
-            .filter(AnnualPlan.user_id == user_id)
+            .filter(AnnualPlan.user_id == user_id, AnnualPlan.plan_year == plan_year)
             .with_for_update()
             .all()
         )
@@ -312,6 +313,8 @@ def update_plan(user_id: int, plan_id: str, payload: Dict[str, object]) -> Dict[
         new_description = (payload.get("description") if "description" in payload else plan.description) or None
         new_score = plan.score_allocation or 0
         new_year = plan.plan_year or datetime.utcnow().year
+        if "year" in payload:
+            new_year = _resolve_plan_year(payload.get("year"), fallback=new_year)
 
         goals_payload: Optional[List[Dict[str, object]]] = None
         if "goals" in payload:
@@ -323,7 +326,11 @@ def update_plan(user_id: int, plan_id: str, payload: Dict[str, object]) -> Dict[
                 raise PlanValidationError("请为规划目标设置分值。")
             new_score = existing_total
 
-        other_total = sum(p.score_allocation or 0 for p in locked_plans if p.id != plan_id)
+        other_total = sum(
+            p.score_allocation or 0
+            for p in locked_plans
+            if p.id != plan_id and (p.plan_year or datetime.utcnow().year) == new_year
+        )
         allowed_capacity = 100 - other_total
         if new_score > allowed_capacity:
             raise ScoreBudgetExceeded(calculate_remaining_score(other_total), new_score)
@@ -331,8 +338,6 @@ def update_plan(user_id: int, plan_id: str, payload: Dict[str, object]) -> Dict[
         plan.title = new_title
         plan.description = new_description
         plan.score_allocation = new_score
-        if "year" in payload:
-            new_year = _resolve_plan_year(payload.get("year"), fallback=new_year)
         plan.plan_year = new_year
 
         if goals_payload is not None:
@@ -405,12 +410,14 @@ def delete_plan(user_id: int, plan_id: str) -> Dict[str, object]:
         if not plan:
             raise PlanNotFoundError("年度规划不存在或已删除。")
 
+        plan_year = plan.plan_year or datetime.utcnow().year
+
         session.delete(plan)
         session.flush()
 
         total_allocated = (
             session.query(func.sum(AnnualPlan.score_allocation))
-            .filter(AnnualPlan.user_id == user_id)
+            .filter(AnnualPlan.user_id == user_id, AnnualPlan.plan_year == plan_year)
             .scalar()
         ) or 0
         return {

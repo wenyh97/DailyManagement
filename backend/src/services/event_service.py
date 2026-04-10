@@ -75,13 +75,42 @@ def generate_repeat_events(
                 repeat_type=repeat_type,
                 repeat_end_date=repeat_end_date,
                 repeat_group_id=repeat_group_id,
-                custom_type_id=base_event_data.get('custom_type_id')
+                custom_type_id=base_event_data.get('custom_type_id'),
+                plan_id=base_event_data.get('plan_id'),
+                goal_id=base_event_data.get('goal_id'),
+                task_id=base_event_data.get('task_id')
             )
             events.append(event)
         
         current_date += timedelta(days=1)
     
     return events
+
+
+def calculate_event_units(event: Event) -> float:
+    """计算事件在规则时间窗内的半小时单位数。"""
+    if not event.start or not event.end:
+        return 0
+
+    if event.allDay:
+        return 0
+
+    start = event.start
+    end = event.end
+
+    if end <= start:
+        return 0
+
+    window_start = datetime.combine(start.date(), datetime.min.time()) + timedelta(hours=7)
+    window_end = datetime.combine(start.date() + timedelta(days=1), datetime.min.time())
+    effective_start = max(start, window_start)
+    effective_end = min(end, window_end)
+
+    if effective_end <= effective_start:
+        return 0
+
+    duration_minutes = (effective_end - effective_start).total_seconds() / 60
+    return duration_minutes / 30
 
 
 def calculate_event_score(event: Event) -> int:
@@ -96,21 +125,16 @@ def calculate_event_score(event: Event) -> int:
     """
     if not event.is_completed or not event.efficiency:
         return 0
-    
-    # 计算事件时长（分钟）
-    duration_minutes = (event.end - event.start).total_seconds() / 60
-    
-    # 转换为半小时单位
-    half_hour_units = duration_minutes / 30
-    
-    # 根据效率计算积分
+
+    half_hour_units = calculate_event_units(event)
+
     if event.efficiency == "high":
         return int(half_hour_units * 2)
     elif event.efficiency == "medium":
         return int(half_hour_units * 1)
     elif event.efficiency == "low":
         return int(half_hour_units * -1)
-    
+
     return 0
 
 
@@ -137,7 +161,7 @@ def recalculate_daily_score_for_date(session, target_date: date, user_id: int) -
     ).all()
 
     total_score = sum(calculate_event_score(e) for e in completed_events)
-    daily_score.total_score = total_score
+    daily_score.total_score = min(68, total_score)
     return daily_score
 
 

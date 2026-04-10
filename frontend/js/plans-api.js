@@ -9,7 +9,13 @@
             update: async () => { throw new Error('apiRequest is not available'); },
             remove: async () => { throw new Error('apiRequest is not available'); },
             updateGoalStatus: async () => { throw new Error('apiRequest is not available'); },
-            reorderGoals: async () => { throw new Error('apiRequest is not available'); }
+            reorderGoals: async () => { throw new Error('apiRequest is not available'); },
+            getExecutionQueue: async () => { throw new Error('apiRequest is not available'); },
+            setExecutionQueue: async () => { throw new Error('apiRequest is not available'); },
+            listTaskStatuses: async () => { throw new Error('apiRequest is not available'); },
+            updateTaskStatus: async () => { throw new Error('apiRequest is not available'); },
+            getTaskProgress: async () => { throw new Error('apiRequest is not available'); },
+            resetTaskEvents: async () => { throw new Error('apiRequest is not available'); }
         };
         return;
     }
@@ -79,6 +85,39 @@
             const response = await apiRequest(`/api/plans/${planId}/goal-order`, 'PATCH', {
                 goal_ids: goalIds
             });
+            return parseResponse(response);
+        },
+        async getExecutionQueue() {
+            const response = await apiRequest('/api/goal-execution-queue', 'GET');
+            return parseResponse(response);
+        },
+        async setExecutionQueue(items) {
+            if (!Array.isArray(items)) {
+                throw new Error('items must be an array');
+            }
+            const response = await apiRequest('/api/goal-execution-queue', 'PUT', { items });
+            return parseResponse(response);
+        },
+        async listTaskStatuses() {
+            const response = await apiRequest('/api/goal-task-statuses', 'GET');
+            return parseResponse(response);
+        },
+        async updateTaskStatus(body) {
+            if (!body || typeof body !== 'object') {
+                throw new Error('body is required');
+            }
+            const response = await apiRequest('/api/goal-task-statuses', 'PATCH', body);
+            return parseResponse(response);
+        },
+        async getTaskProgress() {
+            const response = await apiRequest('/api/task-progress', 'GET');
+            return parseResponse(response);
+        },
+        async resetTaskEvents(body) {
+            if (!body || typeof body !== 'object') {
+                throw new Error('body is required');
+            }
+            const response = await apiRequest('/api/task-events/reset', 'DELETE', body);
             return parseResponse(response);
         }
     };

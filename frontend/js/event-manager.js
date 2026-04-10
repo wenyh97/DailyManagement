@@ -16,6 +16,7 @@
                 '紧急且不重要',
                 '不紧急且不重要'
             ];
+            this.taskLink = null;
             this.initialized = false;
             this.calendarRef = null;
             this.pendingDelete = null;
@@ -810,6 +811,12 @@
                 urgency,
                 remark: normalizedRemark || null
             };
+
+            if (this.taskLink) {
+                payload.planId = this.taskLink.planId;
+                payload.goalId = this.taskLink.goalId;
+                payload.taskId = this.taskLink.taskId;
+            }
             
             if (!isAllDay) {
                 payload.time = `${startTime} - ${endTime}`;
@@ -875,7 +882,10 @@
                 isRepeat: eventData.isRepeat,
                 repeatType: eventData.repeatType,
                 repeatEndDate: eventData.repeatEndDate?.slice(0, 10),
-                remark: eventData.remark || ''
+                remark: eventData.remark || '',
+                taskLink: eventData.planId && eventData.goalId && eventData.taskId
+                    ? { planId: eventData.planId, goalId: eventData.goalId, taskId: eventData.taskId }
+                    : null
             });
             this.modal.classList.remove('hidden');
             document.body.style.overflow = 'hidden';
@@ -963,6 +973,8 @@
             if (this.remarkInput) {
                 this.remarkInput.value = defaults.remark ? String(defaults.remark) : '';
             }
+
+            this.taskLink = defaults.taskLink || null;
 
             const isRepeat = !!defaults.isRepeat;
             this.repeatToggle.checked = isRepeat;
