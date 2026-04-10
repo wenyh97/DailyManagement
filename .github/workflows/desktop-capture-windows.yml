@@ -5,6 +5,7 @@ env:
   SERVER_USER: TonyAdmin
   SERVER_BASE_PATH: /home/TonyAdmin
   DOWNLOAD_BASE_URL: https://dailymanagement.tonybase.site/downloads/desktop
+  RUST_BACKTRACE: 1
 
 on:
   workflow_dispatch:
@@ -44,10 +45,7 @@ jobs:
         run: npm ci
 
       - name: Build Windows installer
-        uses: tauri-apps/tauri-action@v0
-        with:
-          projectPath: desktop-capture
-          args: --bundles nsis
+        run: npm run tauri -- build --bundles nsis --verbose
 
       - name: Prepare release assets
         run: |
