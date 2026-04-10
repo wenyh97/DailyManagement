@@ -1,0 +1,10 @@
+dailymanagement.tonybase.site {
+    encode zstd gzip
+
+    @backend path /api/* /events* /ideas* /event-types* /daily-scores* /daily-score-details* /stats* /health
+    reverse_proxy @backend 127.0.0.1:5000
+
+    root * /srv
+    try_files {path} {path}/ /index.html
+    file_server
+}

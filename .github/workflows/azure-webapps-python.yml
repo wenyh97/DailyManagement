@@ -59,7 +59,7 @@ jobs:
           host: ${{ env.SERVER_HOST }}
           username: ${{ env.SERVER_USER }}
           password: ${{ secrets.SERVER_PASSWORD }}
-          source: "docker-compose.yml,nginx.conf,frontend/**"  # 单行避免 CRLF 造成路径不匹配
+          source: "docker-compose.yml,Caddyfile,frontend/**"  # 单行避免 CRLF 造成路径不匹配
           target: ${{ env.SERVER_BASE_PATH }}/deploy-temp
 
       - name: Deploy and restart services on server  # 远程部署和重启服务
@@ -71,9 +71,9 @@ jobs:
           script: |
             set -euo pipefail
             BASE="${{ env.SERVER_BASE_PATH }}"
-            mkdir -p "$BASE/deploy-temp" "$BASE/docker-compose" "$BASE/nginx" "$BASE/frontend"
+            mkdir -p "$BASE/deploy-temp" "$BASE/docker-compose" "$BASE/caddy" "$BASE/caddy/data" "$BASE/caddy/config" "$BASE/frontend"
             mv "$BASE/deploy-temp/docker-compose.yml" "$BASE/docker-compose/docker-compose.yml"
-            mv "$BASE/deploy-temp/nginx.conf" "$BASE/nginx/nginx.conf"
+            mv "$BASE/deploy-temp/Caddyfile" "$BASE/caddy/Caddyfile"
             cp -r "$BASE/deploy-temp/frontend/." "$BASE/frontend/"
             rm -rf "$BASE/deploy-temp"
             sudo systemctl stop nginx || true
@@ -85,9 +85,12 @@ jobs:
               sudo docker-compose -f "$BASE/docker-compose/docker-compose.yml" pull
               sudo docker-compose -f "$BASE/docker-compose/docker-compose.yml" up -d --remove-orphans
             fi
-            sudo docker pull nginx:1.25-alpine
+            sudo docker pull caddy:2-alpine
             sudo docker rm -f nginx-proxy || true
-            sudo docker run -d --name nginx-proxy --network host \
-              -v "$BASE/nginx/nginx.conf:/etc/nginx/nginx.conf:ro" \
-              -v "$BASE/frontend:/usr/share/nginx/html:ro" \
-              nginx:1.25-alpine
+            sudo docker rm -f caddy-proxy || true
+            sudo docker run -d --name caddy-proxy --restart unless-stopped --network host \
+              -v "$BASE/caddy/Caddyfile:/etc/caddy/Caddyfile:ro" \
+              -v "$BASE/caddy/data:/data" \
+              -v "$BASE/caddy/config:/config" \
+              -v "$BASE/frontend:/srv:ro" \
+              caddy:2-alpine
