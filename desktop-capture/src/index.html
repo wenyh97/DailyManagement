@@ -11,12 +11,18 @@
         <header class="window-chrome">
             <div class="chrome-copy" data-tauri-drag-region>
                 <p class="eyebrow">DAILY MANAGEMENT</p>
-                <h1>灵感收集</h1>
-                <p class="hero-copy">按 Ctrl+Shift+Space 呼出，记一句就收起。</p>
+                <div class="chrome-title-row">
+                    <h1>灵感收集</h1>
+                    <p class="hero-copy">Ctrl+Shift+Space 呼出，记一句就收起</p>
+                </div>
             </div>
             <div class="chrome-actions">
                 <div class="settings-shell">
-                    <button class="ghost-button settings-button" id="settings-button" type="button" aria-haspopup="menu" aria-expanded="false">设置</button>
+                    <button class="ghost-button icon-button settings-button" id="settings-button" type="button" aria-haspopup="menu" aria-expanded="false" aria-label="设置" title="设置">
+                        <svg viewBox="0 0 24 24" aria-hidden="true">
+                            <path d="M10.9 2.9a1 1 0 0 1 2.2 0l.36 1.63a7.68 7.68 0 0 1 1.57.65l1.45-.83a1 1 0 0 1 1.5.87v1.67c.47.37.9.79 1.28 1.26l1.66.01a1 1 0 0 1 .87 1.5l-.84 1.45c.28.5.5 1.03.66 1.58l1.62.35a1 1 0 0 1 0 2.22l-1.62.35a7.6 7.6 0 0 1-.66 1.58l.84 1.45a1 1 0 0 1-.87 1.5l-1.66.02c-.38.46-.81.88-1.28 1.25v1.67a1 1 0 0 1-1.5.87l-1.45-.83a7.68 7.68 0 0 1-1.57.65l-.36 1.63a1 1 0 0 1-2.2 0l-.36-1.63a7.68 7.68 0 0 1-1.57-.65l-1.45.83a1 1 0 0 1-1.5-.87v-1.67a7.93 7.93 0 0 1-1.28-1.25l-1.66-.01a1 1 0 0 1-.87-1.5l.84-1.45a7.6 7.6 0 0 1-.66-1.58l-1.62-.35a1 1 0 0 1 0-2.22l1.62-.35c.16-.55.38-1.08.66-1.58l-.84-1.45a1 1 0 0 1 .87-1.5l1.66-.01c.38-.47.81-.89 1.28-1.26V5.21a1 1 0 0 1 1.5-.87l1.45.83c.5-.28 1.03-.5 1.57-.65zM12 9.2A2.8 2.8 0 1 0 12 14.8 2.8 2.8 0 0 0 12 9.2z" fill="currentColor"/>
+                        </svg>
+                    </button>
                     <div class="settings-menu hidden" id="settings-menu" role="menu">
                         <p class="settings-version" id="settings-version">当前版本读取中</p>
                         <button class="settings-item" id="settings-refresh-button" type="button" role="menuitem">刷新</button>
@@ -24,9 +30,21 @@
                         <button class="settings-item danger" id="settings-logout-button" type="button" role="menuitem">退出登录</button>
                     </div>
                 </div>
-                <button class="ghost-button pin-toggle-button" id="pin-button" type="button" aria-pressed="false">置顶窗口</button>
-                <button class="ghost-button window-control-button" id="minimize-button" type="button">最小化</button>
-                <button class="ghost-button window-control-button danger" id="close-button" type="button">收起窗口</button>
+                <button class="ghost-button icon-button pin-toggle-button" id="pin-button" type="button" aria-pressed="false" aria-label="置顶窗口" title="置顶窗口">
+                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                        <path d="M15.6 3.5 20.5 8.4l-2.1 2.1-1.4-1.4-3.2 3.2v3.3l-1.7 1.7-1.2-4.5-4.5-1.2 1.7-1.7h3.3L14.6 6l-1.4-1.4 2.4-1.1z" fill="currentColor"/>
+                    </svg>
+                </button>
+                <button class="ghost-button icon-button window-control-button" id="minimize-button" type="button" aria-label="最小化" title="最小化">
+                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                        <path d="M6 12.75h12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+                    </svg>
+                </button>
+                <button class="ghost-button icon-button window-control-button danger" id="close-button" type="button" aria-label="收起窗口" title="收起窗口">
+                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                        <path d="m8 8 8 8M16 8l-8 8" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+                    </svg>
+                </button>
             </div>
         </header>
 
@@ -65,12 +83,26 @@
             <section class="panel hidden" id="capture-panel">
                 <div class="panel-heading compact">
                     <div>
-                        <p class="section-label">快速记录</p>
+                        <p class="section-label">最近记录</p>
                         <h2 id="welcome-text">已连接</h2>
                     </div>
+                    <p class="panel-summary">打开窗口第一眼先看最近内容，再决定要不要补一句。</p>
                 </div>
 
-                <form id="capture-form" class="form-stack capture-form">
+                <section class="history-panel featured-history-panel">
+                    <div class="panel-heading compact history-heading">
+                        <div>
+                            <p class="section-label">最近记录</p>
+                            <h3>刚刚收进来的内容</h3>
+                        </div>
+                        <span class="history-badge">优先区</span>
+                    </div>
+                    <ul class="history-list" id="recent-list">
+                        <li class="empty-state">登录后加载最近记录。</li>
+                    </ul>
+                </section>
+
+                <form id="capture-form" class="form-stack capture-form compact-composer">
                     <label class="field">
                         <span>灵感内容</span>
                         <textarea id="idea-input" name="idea" rows="2" placeholder="写下一句想法，按 Ctrl+Enter 直接提交。" required></textarea>
@@ -81,18 +113,6 @@
                     </div>
                     <p class="helper-text" id="capture-status">准备就绪。</p>
                 </form>
-
-                <section class="history-panel">
-                    <div class="panel-heading compact history-heading">
-                        <div>
-                            <p class="section-label">最近记录</p>
-                            <h3>刚刚收进来的内容</h3>
-                        </div>
-                    </div>
-                    <ul class="history-list" id="recent-list">
-                        <li class="empty-state">登录后加载最近记录。</li>
-                    </ul>
-                </section>
             </section>
         </main>
 

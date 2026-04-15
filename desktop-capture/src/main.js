@@ -263,8 +263,9 @@ async function checkForUpdates() {
 }
 
 function renderPinButton() {
-  elements.pinButton.textContent = isWindowPinned ? '取消置顶' : '置顶窗口';
   elements.pinButton.setAttribute('aria-pressed', String(isWindowPinned));
+  elements.pinButton.setAttribute('aria-label', isWindowPinned ? '取消置顶' : '置顶窗口');
+  elements.pinButton.title = isWindowPinned ? '取消置顶' : '置顶窗口';
 }
 
 async function initializeWindowControls() {

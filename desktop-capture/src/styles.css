@@ -18,9 +18,15 @@
     box-sizing: border-box;
 }
 
+html,
+body {
+    height: 100%;
+}
+
 body {
     margin: 0;
     min-height: 100vh;
+    overflow: hidden;
     background:
         radial-gradient(circle at top left, rgba(15, 118, 110, 0.18), transparent 38%),
         linear-gradient(180deg, var(--bg-top), var(--bg-bottom));
@@ -34,18 +40,22 @@ textarea {
 }
 
 .app-shell {
-    min-height: 100vh;
-    padding: 18px;
+    height: 100vh;
+    padding: 14px;
+    display: grid;
+    grid-template-rows: auto auto minmax(0, 1fr);
+    gap: 10px;
+    overflow: hidden;
 }
 
 .window-chrome {
     display: flex;
-    align-items: flex-start;
+    align-items: center;
     justify-content: space-between;
-    gap: 16px;
-    padding: 16px 18px;
-    border: 1px solid var(--panel-border);
-    border-radius: 24px;
+    gap: 12px;
+    padding: 12px 14px;
+    border: 1px solid rgba(76, 93, 121, 0.12);
+    border-radius: 20px;
     background: var(--chrome-bg);
     backdrop-filter: blur(16px);
     box-shadow: var(--shadow);
@@ -56,10 +66,40 @@ textarea {
     min-width: 0;
 }
 
+.chrome-title-row {
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.chrome-title-row h1 {
+    font-size: 28px;
+    line-height: 1.05;
+}
+
 .chrome-actions {
     display: flex;
     align-items: center;
     gap: 8px;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+}
+
+.icon-button {
+    width: 40px;
+    height: 40px;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 14px;
+}
+
+.icon-button svg {
+    width: 18px;
+    height: 18px;
+    flex: 0 0 auto;
 }
 
 .settings-shell {
@@ -67,7 +107,7 @@ textarea {
 }
 
 .settings-button {
-    min-width: 72px;
+    min-width: 0;
 }
 
 .settings-menu {
@@ -125,7 +165,7 @@ textarea {
 }
 
 .hero {
-    margin: 12px 0 14px;
+    margin: 0;
 }
 
 .eyebrow,
@@ -147,7 +187,7 @@ textarea {
 
 .hero-copy,
 .helper-text {
-    margin: 8px 0 0;
+    margin: 0;
     color: var(--text-muted);
     line-height: 1.5;
 }
@@ -156,20 +196,22 @@ textarea {
     margin: 0;
     color: var(--text-muted);
     line-height: 1.5;
+    padding: 0 2px;
 }
 
 .panel-stack {
     display: grid;
-    gap: 14px;
+    min-height: 0;
 }
 
 .panel {
-    padding: 18px;
+    padding: 16px;
     border: 1px solid var(--panel-border);
     border-radius: 22px;
     background: var(--panel);
     backdrop-filter: blur(16px);
     box-shadow: var(--shadow);
+    min-height: 0;
 }
 
 .panel.hidden {
@@ -185,7 +227,16 @@ textarea {
 }
 
 .panel-heading.compact {
-    margin-bottom: 12px;
+    margin-bottom: 10px;
+}
+
+.panel-summary {
+    margin: 0;
+    max-width: 240px;
+    color: var(--text-muted);
+    font-size: 12px;
+    line-height: 1.5;
+    text-align: right;
 }
 
 .header-actions,
@@ -226,9 +277,9 @@ textarea {
 }
 
 .field textarea {
-    resize: vertical;
+    resize: none;
     min-height: 72px;
-    max-height: 160px;
+    max-height: 96px;
 }
 
 .field input:focus,
@@ -271,13 +322,13 @@ textarea {
 }
 
 .window-control-button {
-    min-width: 84px;
+    min-width: 0;
 }
 
 .pin-toggle-button[aria-pressed="true"] {
     background: rgba(15, 118, 110, 0.18);
     color: var(--accent-strong);
-    font-weight: 700;
+    box-shadow: inset 0 0 0 1px rgba(15, 118, 110, 0.14);
 }
 
 .window-control-button.danger {
@@ -289,7 +340,40 @@ textarea {
 }
 
 .capture-form {
-    margin-bottom: 12px;
+    margin: 0;
+}
+
+#capture-panel {
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr) auto;
+    gap: 12px;
+    overflow: hidden;
+}
+
+.compact-composer {
+    padding-top: 2px;
+}
+
+.featured-history-panel {
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr);
+    min-height: 0;
+    padding: 14px;
+    border-radius: 20px;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.88), rgba(239, 246, 244, 0.92));
+    border: 1px solid rgba(15, 118, 110, 0.12);
+}
+
+.history-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 6px 10px;
+    border-radius: 999px;
+    background: rgba(15, 118, 110, 0.1);
+    color: var(--accent-strong);
+    font-size: 12px;
+    font-weight: 700;
 }
 
 .history-list {
@@ -298,22 +382,46 @@ textarea {
     margin: 0;
     display: grid;
     gap: 10px;
-    max-height: 220px;
+    min-height: 0;
     overflow: auto;
+    padding-right: 6px;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(15, 118, 110, 0.32) transparent;
+}
+
+.history-list::-webkit-scrollbar {
+    width: 8px;
+}
+
+.history-list::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.history-list::-webkit-scrollbar-thumb {
+    border-radius: 999px;
+    background: rgba(15, 118, 110, 0.24);
+}
+
+.history-list::-webkit-scrollbar-thumb:hover {
+    background: rgba(15, 118, 110, 0.4);
 }
 
 .history-item,
 .empty-state {
     border-radius: 16px;
-    padding: 12px 14px;
-    background: rgba(249, 250, 251, 0.86);
-    border: 1px solid rgba(226, 232, 240, 0.9);
+    padding: 13px 14px;
+    background: rgba(255, 255, 255, 0.94);
+    border: 1px solid rgba(205, 216, 228, 0.95);
 }
 
 .history-item p,
 .empty-state {
     margin: 0;
     line-height: 1.5;
+}
+
+.history-item p {
+    font-size: 14px;
 }
 
 .history-item time {
@@ -367,7 +475,7 @@ textarea {
 
 @media (max-width: 520px) {
     .app-shell {
-        padding: 14px;
+        padding: 10px;
     }
 
     .window-chrome,
@@ -395,6 +503,11 @@ textarea {
         flex-direction: column;
     }
 
+    .panel-summary {
+        max-width: none;
+        text-align: left;
+    }
+
     .header-actions {
         width: 100%;
     }
@@ -404,5 +517,9 @@ textarea {
     .pin-toggle-button,
     .window-control-button {
         width: 100%;
+    }
+
+    #capture-panel {
+        grid-template-rows: auto minmax(0, 1fr) auto;
     }
 }
