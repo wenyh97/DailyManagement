@@ -10,6 +10,7 @@ const STORAGE_KEYS = {
 };
 
 const DEFAULT_API_BASE = 'https://dailymanagement.tonybase.site';
+const DEFAULT_UPDATE_BASE = 'https://dailymanagement.tonybase.site';
 const DESKTOP_METADATA_PATH = '/downloads/metadata/desktop-latest.json';
 
 const elements = {
@@ -163,12 +164,22 @@ function closeDialog(confirmed) {
   }
 }
 
-function getDesktopMetadataUrl() {
-  try {
-    return new URL(DESKTOP_METADATA_PATH, `${getApiBase()}/`).toString();
-  } catch {
-    return `${DEFAULT_API_BASE}${DESKTOP_METADATA_PATH}`;
-  }
+function getDesktopMetadataUrls() {
+  const candidates = [];
+
+  const appendCandidate = (baseUrl) => {
+    try {
+      const normalizedBase = normalizeApiBase(baseUrl);
+      candidates.push(new URL(DESKTOP_METADATA_PATH, `${normalizedBase}/`).toString());
+    } catch {
+      // Ignore invalid URLs and continue with remaining candidates.
+    }
+  };
+
+  appendCandidate(DEFAULT_UPDATE_BASE);
+  appendCandidate(getApiBase());
+
+  return [...new Set(candidates)];
 }
 
 function compareVersions(left, right) {
@@ -193,20 +204,30 @@ function compareVersions(left, right) {
 }
 
 async function fetchDesktopReleaseMetadata() {
-  const response = await fetch(getDesktopMetadataUrl(), {
-    cache: 'no-store',
-  });
+  const errors = [];
 
-  if (!response.ok) {
-    throw new Error('暂时无法获取版本信息。');
+  for (const metadataUrl of getDesktopMetadataUrls()) {
+    try {
+      const response = await fetch(metadataUrl, {
+        cache: 'no-store',
+      });
+
+      if (!response.ok) {
+        throw new Error(`请求失败（${response.status}）`);
+      }
+
+      const metadata = await response.json();
+      if (!metadata || !metadata.version) {
+        throw new Error('版本信息格式不完整。');
+      }
+
+      return metadata;
+    } catch (error) {
+      errors.push(`${metadataUrl}：${error?.message || '请求失败'}`);
+    }
   }
 
-  const metadata = await response.json();
-  if (!metadata || !metadata.version) {
-    throw new Error('版本信息格式不完整。');
-  }
-
-  return metadata;
+  throw new Error(`暂时无法获取版本信息。\n${errors[0] || '请检查网络或稍后重试。'}`);
 }
 
 async function checkForUpdates() {

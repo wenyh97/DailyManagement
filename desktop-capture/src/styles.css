@@ -39,6 +39,10 @@ textarea {
     font: inherit;
 }
 
+.hidden {
+    display: none !important;
+}
+
 .app-shell {
     height: 100vh;
     padding: 14px;
@@ -49,10 +53,10 @@ textarea {
 }
 
 .window-chrome {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 12px;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: start;
+    gap: 16px;
     padding: 12px 14px;
     border: 1px solid rgba(76, 93, 121, 0.12);
     border-radius: 20px;
@@ -62,28 +66,35 @@ textarea {
 }
 
 .chrome-copy {
-    flex: 1;
+    display: grid;
+    gap: 6px;
     min-width: 0;
 }
 
 .chrome-title-row {
-    display: flex;
-    align-items: baseline;
-    gap: 12px;
-    flex-wrap: wrap;
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: end;
+    column-gap: 14px;
+    row-gap: 4px;
 }
 
 .chrome-title-row h1 {
-    font-size: 28px;
+    font-size: clamp(28px, 5vw, 42px);
     line-height: 1.05;
+}
+
+.hero-copy {
+    min-width: 0;
 }
 
 .chrome-actions {
     display: flex;
     align-items: center;
     gap: 8px;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
     justify-content: flex-end;
+    align-self: start;
 }
 
 .icon-button {
@@ -114,7 +125,7 @@ textarea {
     position: absolute;
     top: calc(100% + 10px);
     right: 0;
-    width: 192px;
+    width: min(192px, calc(100vw - 36px));
     padding: 10px;
     border: 1px solid var(--panel-border);
     border-radius: 18px;
@@ -222,6 +233,7 @@ textarea {
     display: flex;
     align-items: start;
     justify-content: space-between;
+    flex-wrap: wrap;
     gap: 12px;
     margin-bottom: 14px;
 }
@@ -478,19 +490,35 @@ textarea {
         padding: 10px;
     }
 
-    .window-chrome,
+    .window-chrome {
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: 12px;
+        padding: 12px;
+    }
+
+    .chrome-title-row {
+        grid-template-columns: 1fr;
+        align-items: start;
+        gap: 6px;
+    }
+
     .chrome-actions {
-        flex-direction: column;
+        gap: 6px;
+    }
+
+    .icon-button {
+        width: 36px;
+        height: 36px;
     }
 
     .settings-shell,
     .settings-menu {
-        width: 100%;
+        width: auto;
     }
 
     .settings-menu {
-        position: static;
-        margin-top: 8px;
+        position: absolute;
+        margin-top: 0;
     }
 
     .panel {
@@ -498,9 +526,13 @@ textarea {
         border-radius: 18px;
     }
 
-    .panel-heading,
     .row-actions {
         flex-direction: column;
+    }
+
+    .panel-heading {
+        flex-direction: row;
+        align-items: start;
     }
 
     .panel-summary {
