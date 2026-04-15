@@ -15,6 +15,15 @@
                 <p class="hero-copy">按 Ctrl+Shift+Space 呼出，记一句就收起。</p>
             </div>
             <div class="chrome-actions">
+                <div class="settings-shell">
+                    <button class="ghost-button settings-button" id="settings-button" type="button" aria-haspopup="menu" aria-expanded="false">设置</button>
+                    <div class="settings-menu hidden" id="settings-menu" role="menu">
+                        <p class="settings-version" id="settings-version">当前版本读取中</p>
+                        <button class="settings-item" id="settings-refresh-button" type="button" role="menuitem">刷新</button>
+                        <button class="settings-item" id="settings-version-button" type="button" role="menuitem">检测版本</button>
+                        <button class="settings-item danger" id="settings-logout-button" type="button" role="menuitem">退出登录</button>
+                    </div>
+                </div>
                 <button class="ghost-button pin-toggle-button" id="pin-button" type="button" aria-pressed="false">置顶窗口</button>
                 <button class="ghost-button window-control-button" id="minimize-button" type="button">最小化</button>
                 <button class="ghost-button window-control-button danger" id="close-button" type="button">收起窗口</button>
@@ -84,13 +93,20 @@
                         <li class="empty-state">登录后加载最近记录。</li>
                     </ul>
                 </section>
-
-                <div class="panel-footer-actions">
-                    <button class="ghost-button" id="refresh-button" type="button">刷新记录</button>
-                    <button class="ghost-button danger" id="logout-button" type="button">退出登录</button>
-                </div>
             </section>
         </main>
+
+        <div class="dialog-backdrop hidden" id="dialog-backdrop" aria-hidden="true">
+            <section class="dialog-card" role="dialog" aria-modal="true" aria-labelledby="dialog-title">
+                <p class="section-label">桌面更新</p>
+                <h2 id="dialog-title">提示</h2>
+                <p class="dialog-message" id="dialog-message"></p>
+                <div class="dialog-actions">
+                    <button class="secondary-button hidden" id="dialog-cancel-button" type="button">取消</button>
+                    <button class="primary-button" id="dialog-confirm-button" type="button">确定</button>
+                </div>
+            </section>
+        </div>
     </div>
 
     <script type="module" src="./main.js"></script>

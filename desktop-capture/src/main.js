@@ -1,4 +1,5 @@
 import { invoke } from '@tauri-apps/api/core';
+import { getVersion } from '@tauri-apps/api/app';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 
 const STORAGE_KEYS = {
@@ -9,6 +10,7 @@ const STORAGE_KEYS = {
 };
 
 const DEFAULT_API_BASE = 'https://dailymanagement.tonybase.site';
+const DESKTOP_METADATA_PATH = '/downloads/metadata/desktop-latest.json';
 
 const elements = {
   loginPanel: document.getElementById('login-panel'),
@@ -22,8 +24,12 @@ const elements = {
   loginButton: document.getElementById('login-button'),
   submitButton: document.getElementById('submit-button'),
   clearButton: document.getElementById('clear-button'),
-  refreshButton: document.getElementById('refresh-button'),
-  logoutButton: document.getElementById('logout-button'),
+  settingsButton: document.getElementById('settings-button'),
+  settingsMenu: document.getElementById('settings-menu'),
+  settingsVersion: document.getElementById('settings-version'),
+  settingsRefreshButton: document.getElementById('settings-refresh-button'),
+  settingsVersionButton: document.getElementById('settings-version-button'),
+  settingsLogoutButton: document.getElementById('settings-logout-button'),
   pinButton: document.getElementById('pin-button'),
   minimizeButton: document.getElementById('minimize-button'),
   closeButton: document.getElementById('close-button'),
@@ -32,10 +38,17 @@ const elements = {
   windowStatus: document.getElementById('window-status'),
   welcomeText: document.getElementById('welcome-text'),
   recentList: document.getElementById('recent-list'),
+  dialogBackdrop: document.getElementById('dialog-backdrop'),
+  dialogTitle: document.getElementById('dialog-title'),
+  dialogMessage: document.getElementById('dialog-message'),
+  dialogCancelButton: document.getElementById('dialog-cancel-button'),
+  dialogConfirmButton: document.getElementById('dialog-confirm-button'),
 };
 
 const currentWindow = getCurrentWindow();
 let isWindowPinned = false;
+let currentAppVersion = '';
+let dialogResolver = null;
 
 function normalizeApiBase(value) {
   if (!value || typeof value !== 'string') {
@@ -110,12 +123,154 @@ function setWindowStatus(message, isError = false) {
   elements.windowStatus.style.color = isError ? '#b42318' : '';
 }
 
+function setSettingsMenuOpen(open) {
+  elements.settingsMenu.classList.toggle('hidden', !open);
+  elements.settingsButton.setAttribute('aria-expanded', String(open));
+}
+
+function updateSettingsActionsState() {
+  const isAuthenticated = Boolean(getToken() && getUser());
+  elements.settingsRefreshButton.disabled = !isAuthenticated;
+  elements.settingsLogoutButton.disabled = !isAuthenticated;
+}
+
+function setSettingsVersionText(message) {
+  elements.settingsVersion.textContent = message;
+}
+
+function showDialog({ title, message, confirmText = '确定', cancelText = '' }) {
+  elements.dialogTitle.textContent = title;
+  elements.dialogMessage.textContent = message;
+  elements.dialogConfirmButton.textContent = confirmText;
+  elements.dialogCancelButton.textContent = cancelText || '取消';
+  elements.dialogCancelButton.classList.toggle('hidden', !cancelText);
+  elements.dialogBackdrop.classList.remove('hidden');
+  elements.dialogBackdrop.setAttribute('aria-hidden', 'false');
+
+  return new Promise((resolve) => {
+    dialogResolver = resolve;
+  });
+}
+
+function closeDialog(confirmed) {
+  elements.dialogBackdrop.classList.add('hidden');
+  elements.dialogBackdrop.setAttribute('aria-hidden', 'true');
+
+  if (dialogResolver) {
+    const resolve = dialogResolver;
+    dialogResolver = null;
+    resolve(confirmed);
+  }
+}
+
+function getDesktopMetadataUrl() {
+  try {
+    return new URL(DESKTOP_METADATA_PATH, `${getApiBase()}/`).toString();
+  } catch {
+    return `${DEFAULT_API_BASE}${DESKTOP_METADATA_PATH}`;
+  }
+}
+
+function compareVersions(left, right) {
+  const leftParts = String(left).split('.').map((part) => Number.parseInt(part, 10) || 0);
+  const rightParts = String(right).split('.').map((part) => Number.parseInt(part, 10) || 0);
+  const length = Math.max(leftParts.length, rightParts.length);
+
+  for (let index = 0; index < length; index += 1) {
+    const leftValue = leftParts[index] || 0;
+    const rightValue = rightParts[index] || 0;
+
+    if (leftValue > rightValue) {
+      return 1;
+    }
+
+    if (leftValue < rightValue) {
+      return -1;
+    }
+  }
+
+  return 0;
+}
+
+async function fetchDesktopReleaseMetadata() {
+  const response = await fetch(getDesktopMetadataUrl(), {
+    cache: 'no-store',
+  });
+
+  if (!response.ok) {
+    throw new Error('暂时无法获取版本信息。');
+  }
+
+  const metadata = await response.json();
+  if (!metadata || !metadata.version) {
+    throw new Error('版本信息格式不完整。');
+  }
+
+  return metadata;
+}
+
+async function checkForUpdates() {
+  setSettingsMenuOpen(false);
+  elements.settingsVersionButton.disabled = true;
+  setWindowStatus('正在检测新版本...');
+
+  try {
+    const metadata = await fetchDesktopReleaseMetadata();
+    const latestVersion = metadata.version;
+    const downloadUrl = metadata.latestDownloadUrl || metadata.downloadUrl;
+
+    if (!downloadUrl) {
+      throw new Error('服务器返回了版本号，但没有可用下载地址。');
+    }
+
+    setSettingsVersionText(`当前版本 ${currentAppVersion}，最新版本 ${latestVersion}`);
+
+    if (compareVersions(latestVersion, currentAppVersion) <= 0) {
+      setWindowStatus(`当前已是最新版本 ${currentAppVersion}。`);
+      await showDialog({
+        title: '已是最新版本',
+        message: `当前客户端版本是 ${currentAppVersion}，不需要更新。`,
+      });
+      return;
+    }
+
+    const shouldUpdate = await showDialog({
+      title: `发现新版本 ${latestVersion}`,
+      message: `当前版本 ${currentAppVersion}\n新版本 ${latestVersion}\n\n点击“立即更新”后，客户端会下载新版安装包并自动启动安装。`,
+      confirmText: '立即更新',
+      cancelText: '稍后',
+    });
+
+    if (!shouldUpdate) {
+      setWindowStatus('已取消本次更新。');
+      return;
+    }
+
+    setWindowStatus(`正在准备更新到 ${latestVersion}...`);
+    await invoke('download_and_install_update', {
+      downloadUrl,
+      version: latestVersion,
+    });
+  } catch (error) {
+    setWindowStatus(error?.message || '版本检测失败。', true);
+    await showDialog({
+      title: '更新失败',
+      message: error?.message || '这次没有成功完成版本检测，请稍后重试。',
+    });
+  } finally {
+    elements.settingsVersionButton.disabled = false;
+  }
+}
+
 function renderPinButton() {
   elements.pinButton.textContent = isWindowPinned ? '取消置顶' : '置顶窗口';
   elements.pinButton.setAttribute('aria-pressed', String(isWindowPinned));
 }
 
 async function initializeWindowControls() {
+  currentAppVersion = await getVersion();
+  setSettingsVersionText(`当前版本 ${currentAppVersion}`);
+  updateSettingsActionsState();
   renderPinButton();
   setWindowStatus('窗口支持拖拽边缘调整大小，也可以手动固定到最上层。');
 
@@ -269,6 +424,7 @@ function renderAuthState() {
   elements.loginPanel.classList.toggle('hidden', isAuthenticated);
   elements.capturePanel.classList.toggle('hidden', !isAuthenticated);
   elements.apiBaseInput.value = getApiBase();
+  updateSettingsActionsState();
 
   if (isAuthenticated) {
     elements.welcomeText.textContent = `${user.username}，现在可以直接记。`;
@@ -336,15 +492,27 @@ elements.clearButton.addEventListener('click', () => {
   elements.ideaInput.focus();
 });
 
-elements.refreshButton.addEventListener('click', async () => {
+elements.settingsRefreshButton.addEventListener('click', async () => {
+  setSettingsMenuOpen(false);
   await fetchRecentIdeas();
   setCaptureStatus('最近记录已刷新。');
 });
 
-elements.logoutButton.addEventListener('click', () => {
+elements.settingsVersionButton.addEventListener('click', async () => {
+  await checkForUpdates();
+});
+
+elements.settingsLogoutButton.addEventListener('click', () => {
+  setSettingsMenuOpen(false);
   clearToken();
   clearUser();
   renderAuthState();
+});
+
+elements.settingsButton.addEventListener('click', (event) => {
+  event.stopPropagation();
+  const isExpanded = elements.settingsButton.getAttribute('aria-expanded') === 'true';
+  setSettingsMenuOpen(!isExpanded);
 });
 
 elements.pinButton.addEventListener('click', async () => {
@@ -373,6 +541,37 @@ elements.minimizeButton.addEventListener('click', async () => {
 
 elements.closeButton.addEventListener('click', async () => {
   await currentWindow.hide();
+});
+
+elements.dialogConfirmButton.addEventListener('click', () => {
+  closeDialog(true);
+});
+
+elements.dialogCancelButton.addEventListener('click', () => {
+  closeDialog(false);
+});
+
+elements.dialogBackdrop.addEventListener('click', (event) => {
+  if (event.target === elements.dialogBackdrop) {
+    closeDialog(false);
+  }
+});
+
+document.addEventListener('click', (event) => {
+  if (!elements.settingsMenu.contains(event.target) && event.target !== elements.settingsButton) {
+    setSettingsMenuOpen(false);
+  }
+});
+
+document.addEventListener('keydown', (event) => {
+  if (event.key === 'Escape') {
+    if (!elements.dialogBackdrop.classList.contains('hidden')) {
+      closeDialog(false);
+      return;
+    }
+
+    setSettingsMenuOpen(false);
+  }
 });
 
 elements.ideaInput.addEventListener('keydown', async (event) => {

@@ -62,6 +62,68 @@ textarea {
     gap: 8px;
 }
 
+.settings-shell {
+    position: relative;
+}
+
+.settings-button {
+    min-width: 72px;
+}
+
+.settings-menu {
+    position: absolute;
+    top: calc(100% + 10px);
+    right: 0;
+    width: 192px;
+    padding: 10px;
+    border: 1px solid var(--panel-border);
+    border-radius: 18px;
+    background: rgba(255, 255, 255, 0.96);
+    box-shadow: 0 18px 40px rgba(39, 56, 85, 0.16);
+    display: grid;
+    gap: 6px;
+    z-index: 20;
+}
+
+.settings-menu.hidden,
+.dialog-backdrop.hidden {
+    display: none;
+}
+
+.settings-version {
+    margin: 0 0 4px;
+    padding: 8px 10px;
+    border-radius: 12px;
+    background: rgba(15, 118, 110, 0.08);
+    color: var(--text-muted);
+    font-size: 12px;
+    line-height: 1.5;
+}
+
+.settings-item {
+    border: 0;
+    border-radius: 12px;
+    background: transparent;
+    color: var(--text-main);
+    text-align: left;
+    padding: 10px 12px;
+    cursor: pointer;
+    transition: background 0.15s ease, color 0.15s ease;
+}
+
+.settings-item:hover {
+    background: rgba(148, 163, 184, 0.12);
+}
+
+.settings-item:disabled {
+    cursor: not-allowed;
+    opacity: 0.55;
+}
+
+.settings-item.danger {
+    color: var(--danger);
+}
+
 .hero {
     margin: 12px 0 14px;
 }
@@ -230,16 +292,6 @@ textarea {
     margin-bottom: 12px;
 }
 
-.panel-footer-actions {
-    display: flex;
-    gap: 10px;
-    margin-top: 14px;
-}
-
-.panel-footer-actions > * {
-    flex: 1;
-}
-
 .history-list {
     list-style: none;
     padding: 0;
@@ -271,6 +323,48 @@ textarea {
     font-size: 12px;
 }
 
+.dialog-backdrop {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    background: rgba(34, 48, 71, 0.24);
+    backdrop-filter: blur(10px);
+    z-index: 40;
+}
+
+.dialog-card {
+    width: min(100%, 360px);
+    padding: 22px;
+    border: 1px solid var(--panel-border);
+    border-radius: 24px;
+    background: rgba(255, 255, 255, 0.98);
+    box-shadow: 0 24px 48px rgba(39, 56, 85, 0.22);
+}
+
+.dialog-card h2 {
+    margin: 0;
+}
+
+.dialog-message {
+    margin: 12px 0 0;
+    color: var(--text-muted);
+    line-height: 1.6;
+    white-space: pre-line;
+}
+
+.dialog-actions {
+    display: flex;
+    gap: 10px;
+    margin-top: 18px;
+}
+
+.dialog-actions > * {
+    flex: 1;
+}
+
 @media (max-width: 520px) {
     .app-shell {
         padding: 14px;
@@ -279,6 +373,16 @@ textarea {
     .window-chrome,
     .chrome-actions {
         flex-direction: column;
+    }
+
+    .settings-shell,
+    .settings-menu {
+        width: 100%;
+    }
+
+    .settings-menu {
+        position: static;
+        margin-top: 8px;
     }
 
     .panel {
@@ -297,7 +401,6 @@ textarea {
 
     .header-actions button,
     .row-actions button,
-    .panel-footer-actions button,
     .pin-toggle-button,
     .window-control-button {
         width: 100%;

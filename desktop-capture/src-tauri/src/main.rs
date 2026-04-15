@@ -1,5 +1,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+use std::process::Command;
+
 use tauri::menu::{Menu, MenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
 use tauri::{AppHandle, Manager, WindowEvent};
@@ -26,6 +28,54 @@ fn set_window_pinned(app: AppHandle, pinned: bool) -> Result<bool, String> {
     Ok(pinned)
 }
 
+#[tauri::command]
+async fn download_and_install_update(
+    app: AppHandle,
+    download_url: String,
+    version: String,
+) -> Result<(), String> {
+    let response = reqwest::get(&download_url)
+        .await
+        .map_err(|error| format!("下载更新失败: {error}"))?;
+
+    if !response.status().is_success() {
+        return Err(format!("下载更新失败，状态码: {}", response.status()));
+    }
+
+    let installer_bytes = response
+        .bytes()
+        .await
+        .map_err(|error| format!("读取更新包失败: {error}"))?;
+
+    let safe_version = version
+        .chars()
+        .map(|character| {
+            if character.is_ascii_alphanumeric() || character == '.' || character == '-' {
+                character
+            } else {
+                '_'
+            }
+        })
+        .collect::<String>();
+
+    let installer_path = std::env::temp_dir()
+        .join(format!("tonybase-capture-update-{safe_version}.exe"));
+
+    if installer_path.exists() {
+        let _ = std::fs::remove_file(&installer_path);
+    }
+
+    std::fs::write(&installer_path, installer_bytes.as_ref())
+        .map_err(|error| format!("保存更新包失败: {error}"))?;
+
+    Command::new(&installer_path)
+        .spawn()
+        .map_err(|error| format!("启动安装程序失败: {error}"))?;
+
+    app.exit(0);
+    Ok(())
+}
+
 fn show_main_window(app: &AppHandle) {
     if let Some(window) = app.get_webview_window("main") {
         let _ = window.show();
@@ -39,7 +89,8 @@ pub fn run() {
     tauri::Builder::default()
         .invoke_handler(tauri::generate_handler![
             get_window_pinned,
-            set_window_pinned
+            set_window_pinned,
+            download_and_install_update
         ])
         .plugin(
             tauri_plugin_global_shortcut::Builder::new()
