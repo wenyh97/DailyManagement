@@ -989,7 +989,7 @@ def register_routes(app: Flask) -> None:  # 定义路由注册函数以保持结
         current_user_id = int(get_jwt_identity())
         session = SessionLocal()
         try:
-            ideas = session.query(Idea).filter_by(user_id=current_user_id).order_by(Idea.createdAt.desc()).all()
+            ideas = session.query(Idea).filter_by(user_id=current_user_id).order_by(Idea.sort_order.asc(), Idea.createdAt.desc()).all()
             return jsonify([idea_to_dict(i) for i in ideas]), 200
         finally:
             session.close()
@@ -1001,10 +1001,13 @@ def register_routes(app: Flask) -> None:  # 定义路由注册函数以保持结
         payload = request.get_json(force=True)
         session = SessionLocal()
         try:
+            min_sort_order = session.query(func.min(Idea.sort_order)).filter(Idea.user_id == current_user_id).scalar()
             idea = Idea(
                 id=uuid4().hex,
-                text=payload.get("text", "新的灵感"),
+                text=payload.get("text", "新的待办"),
                 createdAt=datetime.utcnow(),
+                is_completed=bool(payload.get("isCompleted", payload.get("is_completed", False))),
+                sort_order=(int(min_sort_order) - 1) if min_sort_order is not None else 0,
                 user_id=current_user_id
             )
             session.add(idea)
@@ -1022,21 +1025,55 @@ def register_routes(app: Flask) -> None:  # 定义路由注册函数以保持结
         try:
             idea = session.query(Idea).filter(Idea.id == idea_id, Idea.user_id == current_user_id).first()
             if not idea:
-                return jsonify({"error": "灵感不存在"}), 404
+                return jsonify({"error": "待办不存在"}), 404
             
             if "text" in payload:
                 idea.text = payload["text"]
+            if "isCompleted" in payload or "is_completed" in payload:
+                idea.is_completed = bool(payload.get("isCompleted", payload.get("is_completed", False)))
+            if "sortOrder" in payload or "sort_order" in payload:
+                raw_sort_order = payload.get("sortOrder", payload.get("sort_order", idea.sort_order))
+                idea.sort_order = int(raw_sort_order)
             
             session.commit()
             return jsonify(idea_to_dict(idea)), 200
         finally:
             session.close()
 
-    @app.route("/ideas/<idea_id>", methods=["DELETE"])
-    def delete_idea(idea_id: str):
+    @app.route("/ideas/reorder", methods=["PATCH"])
+    @jwt_required()
+    def reorder_ideas():
+        current_user_id = int(get_jwt_identity())
+        payload = request.get_json(force=True) or {}
+        ordered_ids = payload.get("orderedIds")
+        if not isinstance(ordered_ids, list) or not ordered_ids:
+            return jsonify({"error": "orderedIds 必须是非空数组"}), 400
+
+        normalized_ids = [str(idea_id) for idea_id in ordered_ids if idea_id]
         session = SessionLocal()
         try:
-            idea = session.query(Idea).filter(Idea.id == idea_id).first()
+            ideas = session.query(Idea).filter(Idea.user_id == current_user_id, Idea.id.in_(normalized_ids)).all()
+            if len(ideas) != len(normalized_ids):
+                return jsonify({"error": "存在无效的待办条目"}), 400
+
+            idea_map = {idea.id: idea for idea in ideas}
+            for index, idea_id in enumerate(normalized_ids):
+                idea_map[idea_id].sort_order = index
+
+            session.commit()
+
+            ordered_ideas = session.query(Idea).filter_by(user_id=current_user_id).order_by(Idea.sort_order.asc(), Idea.createdAt.desc()).all()
+            return jsonify([idea_to_dict(idea) for idea in ordered_ideas]), 200
+        finally:
+            session.close()
+
+    @app.route("/ideas/<idea_id>", methods=["DELETE"])
+    @jwt_required()
+    def delete_idea(idea_id: str):
+        current_user_id = int(get_jwt_identity())
+        session = SessionLocal()
+        try:
+            idea = session.query(Idea).filter(Idea.id == idea_id, Idea.user_id == current_user_id).first()
             if not idea:
                 return jsonify({"status": "not_found"}), 404
             session.delete(idea)
@@ -1183,7 +1220,9 @@ def register_routes(app: Flask) -> None:  # 定义路由注册函数以保持结
                     conflict = session.query(EventType).filter(
                         EventType.user_id.is_(None),
                         func.lower(EventType.name) == normalized_name,
-                        EventType.id != type_id
+                        Eve
+                        灵感收集
+                        Ctrl+Shift+Space 呼出，记一句就收起ntType.id != type_id
                     ).first()
                 else:
                     conflict = session.query(EventType).filter(

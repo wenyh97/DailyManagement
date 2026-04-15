@@ -42,8 +42,29 @@ def init_db() -> None:
     """Create tables for all SQLAlchemy models defined in the project."""
     Base.metadata.create_all(bind=engine)
     _ensure_event_table_columns()
+    _ensure_idea_table_columns()
     _ensure_user_id_columns()
     _cleanup_legacy_idea_columns()
+
+
+def _ensure_idea_table_columns() -> None:
+    """Add newly introduced columns on existing ideas tables."""
+    inspector = inspect(engine)
+    if 'ideas' not in inspector.get_table_names():
+        return
+
+    existing_columns = {column['name'] for column in inspector.get_columns('ideas')}
+    alter_clauses = []
+
+    if 'is_completed' not in existing_columns:
+        alter_clauses.append('ADD COLUMN is_completed TINYINT(1) NOT NULL DEFAULT 0')
+    if 'sort_order' not in existing_columns:
+        alter_clauses.append('ADD COLUMN sort_order INT NOT NULL DEFAULT 0')
+
+    if alter_clauses:
+        alter_sql = f"ALTER TABLE ideas {', '.join(alter_clauses)}"
+        with engine.begin() as connection:
+            connection.execute(text(alter_sql))
 
 
 def _ensure_user_id_columns() -> None:

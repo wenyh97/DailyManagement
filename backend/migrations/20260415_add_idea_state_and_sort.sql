@@ -1,0 +1,3 @@
+ALTER TABLE ideas
+    ADD COLUMN is_completed TINYINT(1) NOT NULL DEFAULT 0,
+    ADD COLUMN sort_order INT NOT NULL DEFAULT 0;

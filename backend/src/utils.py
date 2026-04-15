@@ -28,6 +28,8 @@ def idea_to_dict(idea):
         "id": idea.id,
         "text": idea.text,
         "createdAt": idea.createdAt.isoformat() + "Z" if idea.createdAt else None,
+        "isCompleted": bool(getattr(idea, 'is_completed', False)),
+        "sortOrder": int(getattr(idea, 'sort_order', 0) or 0),
     }
 
 def event_type_to_dict(event_type):
