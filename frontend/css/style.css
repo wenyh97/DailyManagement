@@ -1382,6 +1382,174 @@ select.urgency-fallback::-ms-expand { display:none; }
     box-shadow: 0 4px 12px rgba(245, 87, 108, 0.4);
 }
 
+.idea-item {
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.96) 0%, rgba(240, 247, 255, 0.92) 100%);
+    padding: 12px 14px;
+    margin-bottom: 8px;
+    border-radius: 14px;
+    border: 1px solid rgba(148, 163, 184, 0.22);
+    border-left: none;
+    transition: transform 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease;
+    gap: 12px;
+    box-shadow: 0 8px 20px rgba(15, 23, 42, 0.06);
+    cursor: grab;
+    position: relative;
+}
+
+.idea-item:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 12px 24px rgba(59, 130, 246, 0.14);
+    overflow: visible;
+}
+
+.idea-item.dragging {
+    opacity: 0.55;
+    cursor: grabbing;
+}
+
+.idea-item.is-completed {
+    background: linear-gradient(180deg, rgba(248, 250, 252, 0.96) 0%, rgba(241, 245, 249, 0.9) 100%);
+    border-color: rgba(148, 163, 184, 0.18);
+}
+
+.idea-check {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.idea-check input {
+    position: absolute;
+    opacity: 0;
+    pointer-events: none;
+}
+
+.idea-check-mark {
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    border: 2px solid rgba(148, 163, 184, 0.65);
+    background: #fff;
+    position: relative;
+    transition: border-color 0.2s ease, background 0.2s ease, transform 0.2s ease;
+}
+
+.idea-check input:checked + .idea-check-mark {
+    border-color: #10b981;
+    background: #10b981;
+    transform: scale(0.98);
+}
+
+.idea-check input:checked + .idea-check-mark::after {
+    content: '';
+    position: absolute;
+    left: 6px;
+    top: 2px;
+    width: 5px;
+    height: 10px;
+    border: solid #fff;
+    border-width: 0 2px 2px 0;
+    transform: rotate(45deg);
+}
+
+.idea-content {
+    max-width: none;
+    display: block;
+}
+
+.idea-text {
+    color: #1f2937;
+    word-break: break-word;
+    white-space: normal;
+}
+
+.idea-item.is-completed .idea-text,
+.idea-item.is-completed .idea-time {
+    text-decoration: line-through;
+    color: #94a3b8;
+}
+
+.idea-actions {
+    align-items: center;
+}
+
+.idea-actions .btn-convert {
+    padding: 8px 12px;
+    border-radius: 10px;
+    background: linear-gradient(135deg, #2563eb 0%, #4f46e5 100%);
+    box-shadow: 0 8px 16px rgba(79, 70, 229, 0.18);
+}
+
+.idea-actions .btn-convert:hover {
+    box-shadow: 0 12px 20px rgba(79, 70, 229, 0.24);
+}
+
+.idea-menu-shell {
+    position: relative;
+}
+
+.idea-menu-toggle {
+    width: 38px;
+    height: 38px;
+    border: none;
+    border-radius: 10px;
+    background: rgba(148, 163, 184, 0.14);
+    color: #475569;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+}
+
+.idea-menu-toggle:hover,
+.idea-menu-toggle[aria-expanded="true"] {
+    background: rgba(59, 130, 246, 0.14);
+    color: #2563eb;
+}
+
+.idea-menu-toggle svg {
+    width: 17px;
+    height: 17px;
+}
+
+.idea-item-menu {
+    position: absolute;
+    top: calc(100% + 8px);
+    right: 0;
+    min-width: 120px;
+    background: rgba(255, 255, 255, 0.98);
+    border: 1px solid rgba(148, 163, 184, 0.22);
+    border-radius: 12px;
+    box-shadow: 0 18px 24px rgba(15, 23, 42, 0.12);
+    padding: 6px;
+    display: grid;
+    gap: 4px;
+    z-index: 5;
+}
+
+.idea-item-menu[hidden] {
+    display: none;
+}
+
+.idea-menu-action {
+    border: none;
+    background: transparent;
+    color: #1f2937;
+    padding: 8px 10px;
+    border-radius: 9px;
+    text-align: left;
+    cursor: pointer;
+}
+
+.idea-menu-action:hover {
+    background: rgba(148, 163, 184, 0.12);
+}
+
+.idea-menu-action.danger {
+    color: #dc2626;
+}
+
 /* 输入组 */
 .input-group {
     display: flex;
