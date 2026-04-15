@@ -200,12 +200,30 @@
             <div id="page-ideas" class="page-content">
                 <div class="glass-card">
                     <div class="section-header">
-                        <h2><span class="icon">☑️</span> 待办收集站</h2>
+                        <h2><span class="icon">☑️</span> 待办收集</h2>
                     </div>
-                    <div id="ideas-list" class="ideas-container"></div>
-                    <div class="input-group">
-                        <input type="text" id="new-idea" placeholder="✍️ 记录新的待办事项...">
-                        <button id="add-idea" class="btn-primary">+ 添加待办</button>
+                    <div class="ideas-board">
+                        <section class="ideas-section">
+                            <div class="ideas-section-header">
+                                <h3>代办收集站</h3>
+                                <span class="ideas-section-tip">当前待处理</span>
+                            </div>
+                            <div id="ideas-list" class="ideas-container"></div>
+                            <div class="input-group">
+                                <input type="text" id="new-idea" placeholder="✍️ 记录新的待办事项...">
+                                <button id="add-idea" class="btn-primary">+ 添加待办</button>
+                            </div>
+                        </section>
+                        <section class="ideas-section ideas-section-archive">
+                            <div class="ideas-section-header">
+                                <h3>代办收纳站</h3>
+                                <div class="ideas-section-actions">
+                                    <span class="ideas-section-tip">已完成，可随时恢复</span>
+                                    <button id="ideas-archive-toggle" class="ideas-section-toggle" type="button" aria-expanded="false">展开</button>
+                                </div>
+                            </div>
+                            <div id="ideas-archive-list" class="ideas-container ideas-archive-container" hidden></div>
+                        </section>
                     </div>
                 </div>
             </div>

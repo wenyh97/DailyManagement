@@ -29,6 +29,7 @@ def idea_to_dict(idea):
         "text": idea.text,
         "createdAt": idea.createdAt.isoformat() + "Z" if idea.createdAt else None,
         "isCompleted": bool(getattr(idea, 'is_completed', False)),
+        "completedAt": idea.completed_at.isoformat() + "Z" if getattr(idea, 'completed_at', None) else None,
         "sortOrder": int(getattr(idea, 'sort_order', 0) or 0),
     }
 

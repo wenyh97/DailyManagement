@@ -1002,11 +1002,13 @@ def register_routes(app: Flask) -> None:  # 定义路由注册函数以保持结
         session = SessionLocal()
         try:
             min_sort_order = session.query(func.min(Idea.sort_order)).filter(Idea.user_id == current_user_id).scalar()
+            is_completed = bool(payload.get("isCompleted", payload.get("is_completed", False)))
             idea = Idea(
                 id=uuid4().hex,
                 text=payload.get("text", "新的待办"),
                 createdAt=datetime.utcnow(),
-                is_completed=bool(payload.get("isCompleted", payload.get("is_completed", False))),
+                is_completed=is_completed,
+                completed_at=datetime.utcnow() if is_completed else None,
                 sort_order=(int(min_sort_order) - 1) if min_sort_order is not None else 0,
                 user_id=current_user_id
             )
@@ -1030,7 +1032,9 @@ def register_routes(app: Flask) -> None:  # 定义路由注册函数以保持结
             if "text" in payload:
                 idea.text = payload["text"]
             if "isCompleted" in payload or "is_completed" in payload:
-                idea.is_completed = bool(payload.get("isCompleted", payload.get("is_completed", False)))
+                next_completed = bool(payload.get("isCompleted", payload.get("is_completed", False)))
+                idea.is_completed = next_completed
+                idea.completed_at = datetime.utcnow() if next_completed else None
             if "sortOrder" in payload or "sort_order" in payload:
                 raw_sort_order = payload.get("sortOrder", payload.get("sort_order", idea.sort_order))
                 idea.sort_order = int(raw_sort_order)

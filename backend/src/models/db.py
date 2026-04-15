@@ -58,6 +58,8 @@ def _ensure_idea_table_columns() -> None:
 
     if 'is_completed' not in existing_columns:
         alter_clauses.append('ADD COLUMN is_completed TINYINT(1) NOT NULL DEFAULT 0')
+    if 'completed_at' not in existing_columns:
+        alter_clauses.append('ADD COLUMN completed_at DATETIME NULL')
     if 'sort_order' not in existing_columns:
         alter_clauses.append('ADD COLUMN sort_order INT NOT NULL DEFAULT 0')
 

@@ -8,5 +8,6 @@ class Idea(Base):
     text = Column(String(256), nullable=False)
     createdAt = Column(DateTime, default=datetime.datetime.utcnow)
     is_completed = Column(Boolean, default=False, nullable=False, index=True)
+    completed_at = Column(DateTime, nullable=True, index=True)
     sort_order = Column(Integer, default=0, nullable=False, index=True)
     user_id = Column(Integer, ForeignKey('users.id'), nullable=True, index=True) # 关联用户ID
