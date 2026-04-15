@@ -8,10 +8,21 @@
 </head>
 <body>
     <div class="app-shell">
+        <header class="window-chrome">
+            <div class="chrome-copy" data-tauri-drag-region>
+                <p class="eyebrow">DAILY MANAGEMENT</p>
+                <h1>灵感收集</h1>
+                <p class="hero-copy">按 Ctrl+Shift+Space 呼出，记一句就收起。</p>
+            </div>
+            <div class="chrome-actions">
+                <button class="ghost-button pin-toggle-button" id="pin-button" type="button" aria-pressed="false">置顶窗口</button>
+                <button class="ghost-button window-control-button" id="minimize-button" type="button">最小化</button>
+                <button class="ghost-button window-control-button danger" id="close-button" type="button">收起窗口</button>
+            </div>
+        </header>
+
         <header class="hero">
-            <p class="eyebrow">Desktop Capture</p>
-            <h1>TonyBase Capture</h1>
-            <p class="hero-copy">按 Ctrl+Shift+Space 呼出，记一句就收起。</p>
+            <p class="window-status" id="window-status">窗口支持拖拽边缘调整大小，也可以手动固定到最上层。</p>
         </header>
 
         <main class="panel-stack">
@@ -48,20 +59,16 @@
                         <p class="section-label">快速记录</p>
                         <h2 id="welcome-text">已连接</h2>
                     </div>
-                    <div class="header-actions">
-                        <button class="ghost-button" id="refresh-button" type="button">刷新</button>
-                        <button class="ghost-button danger" id="logout-button" type="button">退出</button>
-                    </div>
                 </div>
 
                 <form id="capture-form" class="form-stack capture-form">
                     <label class="field">
                         <span>灵感内容</span>
-                        <textarea id="idea-input" name="idea" rows="4" placeholder="写下一句想法，按 Ctrl+Enter 直接提交。" required></textarea>
+                        <textarea id="idea-input" name="idea" rows="2" placeholder="写下一句想法，按 Ctrl+Enter 直接提交。" required></textarea>
                     </label>
                     <div class="row-actions">
-                        <button class="secondary-button" id="clear-button" type="button">清空</button>
-                        <button class="primary-button" id="submit-button" type="submit">提交</button>
+                        <button class="primary-button" id="submit-button" type="submit">立即记录</button>
+                        <button class="secondary-button" id="clear-button" type="button">清空草稿</button>
                     </div>
                     <p class="helper-text" id="capture-status">准备就绪。</p>
                 </form>
@@ -77,6 +84,11 @@
                         <li class="empty-state">登录后加载最近记录。</li>
                     </ul>
                 </section>
+
+                <div class="panel-footer-actions">
+                    <button class="ghost-button" id="refresh-button" type="button">刷新记录</button>
+                    <button class="ghost-button danger" id="logout-button" type="button">退出登录</button>
+                </div>
             </section>
         </main>
     </div>

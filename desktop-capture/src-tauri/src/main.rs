@@ -1,7 +1,30 @@
+#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
+
 use tauri::menu::{Menu, MenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
 use tauri::{AppHandle, Manager, WindowEvent};
 use tauri_plugin_global_shortcut::ShortcutState;
+
+#[tauri::command]
+fn get_window_pinned(app: AppHandle) -> Result<bool, String> {
+    app.get_webview_window("main")
+        .ok_or_else(|| "未找到主窗口".to_string())?
+        .is_always_on_top()
+        .map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+fn set_window_pinned(app: AppHandle, pinned: bool) -> Result<bool, String> {
+    let window = app
+        .get_webview_window("main")
+        .ok_or_else(|| "未找到主窗口".to_string())?;
+
+    window
+        .set_always_on_top(pinned)
+        .map_err(|error| error.to_string())?;
+
+    Ok(pinned)
+}
 
 fn show_main_window(app: &AppHandle) {
     if let Some(window) = app.get_webview_window("main") {
@@ -14,6 +37,10 @@ fn show_main_window(app: &AppHandle) {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .invoke_handler(tauri::generate_handler![
+            get_window_pinned,
+            set_window_pinned
+        ])
         .plugin(
             tauri_plugin_global_shortcut::Builder::new()
                 .with_shortcuts(["ctrl+shift+space"])

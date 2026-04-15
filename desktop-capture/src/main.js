@@ -1,7 +1,11 @@
+import { invoke } from '@tauri-apps/api/core';
+import { getCurrentWindow } from '@tauri-apps/api/window';
+
 const STORAGE_KEYS = {
   apiBase: 'tonybase.desktop.apiBase',
   token: 'tonybase.desktop.accessToken',
   user: 'tonybase.desktop.user',
+  pinned: 'tonybase.desktop.windowPinned',
 };
 
 const DEFAULT_API_BASE = 'https://dailymanagement.tonybase.site';
@@ -20,11 +24,18 @@ const elements = {
   clearButton: document.getElementById('clear-button'),
   refreshButton: document.getElementById('refresh-button'),
   logoutButton: document.getElementById('logout-button'),
+  pinButton: document.getElementById('pin-button'),
+  minimizeButton: document.getElementById('minimize-button'),
+  closeButton: document.getElementById('close-button'),
   loginStatus: document.getElementById('login-status'),
   captureStatus: document.getElementById('capture-status'),
+  windowStatus: document.getElementById('window-status'),
   welcomeText: document.getElementById('welcome-text'),
   recentList: document.getElementById('recent-list'),
 };
+
+const currentWindow = getCurrentWindow();
+let isWindowPinned = false;
 
 function normalizeApiBase(value) {
   if (!value || typeof value !== 'string') {
@@ -76,6 +87,14 @@ function clearUser() {
   localStorage.removeItem(STORAGE_KEYS.user);
 }
 
+function getPinnedPreference() {
+  return localStorage.getItem(STORAGE_KEYS.pinned) === 'true';
+}
+
+function savePinnedPreference(pinned) {
+  localStorage.setItem(STORAGE_KEYS.pinned, String(Boolean(pinned)));
+}
+
 function setLoginStatus(message, isError = false) {
   elements.loginStatus.textContent = message;
   elements.loginStatus.style.color = isError ? '#b42318' : '';
@@ -84,6 +103,42 @@ function setLoginStatus(message, isError = false) {
 function setCaptureStatus(message, isError = false) {
   elements.captureStatus.textContent = message;
   elements.captureStatus.style.color = isError ? '#b42318' : '';
+}
+
+function setWindowStatus(message, isError = false) {
+  elements.windowStatus.textContent = message;
+  elements.windowStatus.style.color = isError ? '#b42318' : '';
+}
+
+function renderPinButton() {
+  elements.pinButton.textContent = isWindowPinned ? '取消置顶' : '置顶窗口';
+  elements.pinButton.setAttribute('aria-pressed', String(isWindowPinned));
+}
+
+async function initializeWindowControls() {
+  renderPinButton();
+  setWindowStatus('窗口支持拖拽边缘调整大小，也可以手动固定到最上层。');
+
+  try {
+    let pinned = await invoke('get_window_pinned');
+    const preferredPinned = getPinnedPreference();
+
+    if (preferredPinned !== pinned) {
+      pinned = await invoke('set_window_pinned', { pinned: preferredPinned });
+    }
+
+    isWindowPinned = Boolean(pinned);
+    savePinnedPreference(isWindowPinned);
+    renderPinButton();
+    setWindowStatus(
+      isWindowPinned
+        ? '窗口已固定在最上层，也支持拖拽边缘调整大小。'
+        : '窗口支持拖拽边缘调整大小，也可以手动固定到最上层。'
+    );
+  } catch (error) {
+    elements.pinButton.disabled = true;
+    setWindowStatus(error?.message || '当前无法读取窗口状态。', true);
+  }
 }
 
 function escapeHtml(value) {
@@ -292,6 +347,34 @@ elements.logoutButton.addEventListener('click', () => {
   renderAuthState();
 });
 
+elements.pinButton.addEventListener('click', async () => {
+  elements.pinButton.disabled = true;
+
+  try {
+    const pinned = await invoke('set_window_pinned', { pinned: !isWindowPinned });
+    isWindowPinned = Boolean(pinned);
+    savePinnedPreference(isWindowPinned);
+    renderPinButton();
+    setWindowStatus(
+      isWindowPinned
+        ? '窗口已固定在最上层。'
+        : '窗口已取消置顶，可被其他窗口覆盖。'
+    );
+  } catch (error) {
+    setWindowStatus(error?.message || '置顶设置失败。', true);
+  } finally {
+    elements.pinButton.disabled = false;
+  }
+});
+
+elements.minimizeButton.addEventListener('click', async () => {
+  await currentWindow.minimize();
+});
+
+elements.closeButton.addEventListener('click', async () => {
+  await currentWindow.hide();
+});
+
 elements.ideaInput.addEventListener('keydown', async (event) => {
   if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') {
     event.preventDefault();
@@ -299,4 +382,5 @@ elements.ideaInput.addEventListener('keydown', async (event) => {
   }
 });
 
+void initializeWindowControls();
 renderAuthState();
