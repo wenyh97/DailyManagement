@@ -1,7 +1,7 @@
 {
-  "name": "日常管理快速记录",
-  "short_name": "快速记录",
-  "description": "用于快速收集一句话灵感和临时想法的移动入口。",
+  "name": "日常管理待办收集",
+  "short_name": "待办收集",
+  "description": "用于快速收集一句话待办和临时事项的移动入口。",
   "start_url": "/capture.html",
   "scope": "/",
   "display": "standalone",

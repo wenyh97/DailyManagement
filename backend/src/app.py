@@ -1220,9 +1220,7 @@ def register_routes(app: Flask) -> None:  # 定义路由注册函数以保持结
                     conflict = session.query(EventType).filter(
                         EventType.user_id.is_(None),
                         func.lower(EventType.name) == normalized_name,
-                        Eve
-                        灵感收集
-                        Ctrl+Shift+Space 呼出，记一句就收起ntType.id != type_id
+                        EventType.id != type_id
                     ).first()
                 else:
                     conflict = session.query(EventType).filter(

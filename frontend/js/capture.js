@@ -91,7 +91,7 @@
 
     function renderRecent(ideas) {
         if (!Array.isArray(ideas) || !ideas.length) {
-            recentList.innerHTML = '<li class="empty-state">还没有收进来的灵感，先写下第一条。</li>';
+            recentList.innerHTML = '<li class="empty-state">还没有收进来的待办，先写下第一条。</li>';
             return;
         }
 
@@ -127,17 +127,17 @@
     }
 
     async function fetchRecentIdeas() {
-        recentList.innerHTML = '<li class="empty-state">正在加载刚刚记下的内容...</li>';
+        recentList.innerHTML = '<li class="empty-state">正在加载刚刚记下的待办...</li>';
         try {
             const response = await apiRequest('/ideas');
             if (!response.ok) {
-                throw new Error('Failed to load ideas');
+                throw new Error('Failed to load todos');
             }
             const ideas = await response.json();
             renderRecent(ideas);
         } catch (error) {
             console.error('[Capture] Failed to load recent ideas:', error);
-            recentList.innerHTML = '<li class="empty-state">暂时无法加载刚刚记下的内容。</li>';
+            recentList.innerHTML = '<li class="empty-state">暂时无法加载刚刚记下的待办。</li>';
         }
     }
 
@@ -204,7 +204,7 @@
         event.preventDefault();
         const text = input.value.trim();
         if (!text) {
-            captureHelp.textContent = '请输入一句要记录的内容。';
+            captureHelp.textContent = '请输入一句要处理的内容。';
             input.focus();
             return;
         }
