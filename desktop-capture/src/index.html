@@ -3,66 +3,18 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>TonyBase Capture</title>
+    <title>DAILY MANAGEMENT</title>
     <link rel="stylesheet" href="./styles.css">
 </head>
 <body>
     <div class="app-shell">
-        <header class="window-chrome">
-            <div class="chrome-copy" data-tauri-drag-region>
-                <p class="eyebrow">DAILY MANAGEMENT</p>
-                <div class="chrome-title-row">
-                    <h1>待办收集</h1>
-                    <p class="hero-copy">Ctrl+Shift+Space 呼出，记一句就收起</p>
-                </div>
-            </div>
-            <div class="chrome-actions">
-                <div class="settings-shell">
-                    <button class="ghost-button icon-button settings-button" id="settings-button" type="button" aria-haspopup="menu" aria-expanded="false" aria-label="设置" title="设置">
-                        <svg viewBox="0 0 24 24" aria-hidden="true">
-                            <path d="M10.9 2.9a1 1 0 0 1 2.2 0l.36 1.63a7.68 7.68 0 0 1 1.57.65l1.45-.83a1 1 0 0 1 1.5.87v1.67c.47.37.9.79 1.28 1.26l1.66.01a1 1 0 0 1 .87 1.5l-.84 1.45c.28.5.5 1.03.66 1.58l1.62.35a1 1 0 0 1 0 2.22l-1.62.35a7.6 7.6 0 0 1-.66 1.58l.84 1.45a1 1 0 0 1-.87 1.5l-1.66.02c-.38.46-.81.88-1.28 1.25v1.67a1 1 0 0 1-1.5.87l-1.45-.83a7.68 7.68 0 0 1-1.57.65l-.36 1.63a1 1 0 0 1-2.2 0l-.36-1.63a7.68 7.68 0 0 1-1.57-.65l-1.45.83a1 1 0 0 1-1.5-.87v-1.67a7.93 7.93 0 0 1-1.28-1.25l-1.66-.01a1 1 0 0 1-.87-1.5l.84-1.45a7.6 7.6 0 0 1-.66-1.58l-1.62-.35a1 1 0 0 1 0-2.22l1.62-.35c.16-.55.38-1.08.66-1.58l-.84-1.45a1 1 0 0 1 .87-1.5l1.66-.01c.38-.47.81-.89 1.28-1.26V5.21a1 1 0 0 1 1.5-.87l1.45.83c.5-.28 1.03-.5 1.57-.65zM12 9.2A2.8 2.8 0 1 0 12 14.8 2.8 2.8 0 0 0 12 9.2z" fill="currentColor"/>
-                        </svg>
-                    </button>
-                    <div class="settings-menu hidden" id="settings-menu" role="menu">
-                        <p class="settings-version" id="settings-version">当前版本读取中</p>
-                        <button class="settings-item" id="settings-refresh-button" type="button" role="menuitem">刷新</button>
-                        <button class="settings-item" id="settings-version-button" type="button" role="menuitem">检测版本</button>
-                        <button class="settings-item danger" id="settings-logout-button" type="button" role="menuitem">退出登录</button>
-                    </div>
-                </div>
-                <button class="ghost-button icon-button pin-toggle-button" id="pin-button" type="button" aria-pressed="false" aria-label="置顶窗口" title="置顶窗口">
-                    <svg viewBox="0 0 24 24" aria-hidden="true">
-                        <path d="M15.6 3.5 20.5 8.4l-2.1 2.1-1.4-1.4-3.2 3.2v3.3l-1.7 1.7-1.2-4.5-4.5-1.2 1.7-1.7h3.3L14.6 6l-1.4-1.4 2.4-1.1z" fill="currentColor"/>
-                    </svg>
-                </button>
-                <button class="ghost-button icon-button window-control-button" id="minimize-button" type="button" aria-label="最小化" title="最小化">
-                    <svg viewBox="0 0 24 24" aria-hidden="true">
-                        <path d="M6 12.75h12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
-                    </svg>
-                </button>
-                <button class="ghost-button icon-button window-control-button danger" id="close-button" type="button" aria-label="收起窗口" title="收起窗口">
-                    <svg viewBox="0 0 24 24" aria-hidden="true">
-                        <path d="m8 8 8 8M16 8l-8 8" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
-                    </svg>
-                </button>
-            </div>
-        </header>
-
-        <header class="hero">
-            <p class="window-status" id="window-status">窗口支持拖拽边缘调整大小，也可以手动固定到最上层。</p>
-        </header>
-
         <main class="panel-stack">
-            <section class="panel" id="login-panel">
-                <div class="panel-heading">
-                    <div>
-                        <p class="section-label">账号登录</p>
-                        <h2>连接你的 DailyManagement</h2>
-                    </div>
-                    <button class="ghost-button" id="toggle-settings-button" type="button">服务地址</button>
+            <section class="panel login-panel" id="login-panel">
+                <div class="panel-header">
+                    <p class="section-label">DAILY MANAGEMENT</p>
+                    <h1>登录</h1>
                 </div>
-
-                <form id="login-form" class="form-stack">
+                <form id="login-form" class="form-stack login-form">
                     <label class="field">
                         <span>服务地址</span>
                         <input id="api-base-input" name="apiBase" type="url" placeholder="https://dailymanagement.tonybase.site" required>
@@ -75,46 +27,59 @@
                         <span>密码</span>
                         <input id="password-input" name="password" type="password" autocomplete="current-password" required>
                     </label>
-                    <button class="primary-button" id="login-button" type="submit">登录并开始记录</button>
-                    <p class="helper-text" id="login-status">首次启动需要登录一次。</p>
+                    <button class="primary-button" id="login-button" type="submit">登录</button>
+                    <p class="status-text" id="login-status"></p>
                 </form>
             </section>
 
-            <section class="panel hidden" id="capture-panel">
-                <div class="panel-heading compact">
-                    <div>
-                        <p class="section-label">最近记录</p>
-                        <h2 id="welcome-text">已连接</h2>
-                    </div>
-                    <p class="panel-summary">打开窗口第一眼先看最近内容，再决定要不要补一句。</p>
-                </div>
-
-                <section class="history-panel featured-history-panel">
-                    <div class="panel-heading compact history-heading">
+            <section class="panel hidden capture-panel" id="capture-panel">
+                <section class="history-panel">
+                    <div class="history-header">
                         <div>
-                            <p class="section-label">最近记录</p>
-                            <h3>刚刚收进来的内容</h3>
+                            <p class="section-label">DAILY MANAGEMENT</p>
+                            <h1>最近待办</h1>
                         </div>
-                        <span class="history-badge">优先区</span>
+                        <span class="history-count" id="recent-count">0</span>
                     </div>
                     <ul class="history-list" id="recent-list">
-                        <li class="empty-state">登录后加载最近记录。</li>
+                        <li class="empty-state">暂无记录</li>
                     </ul>
                 </section>
 
-                <form id="capture-form" class="form-stack capture-form compact-composer">
-                    <label class="field">
-                        <span>待办内容</span>
-                        <textarea id="idea-input" name="idea" rows="2" placeholder="写下一句想法，按 Ctrl+Enter 直接提交。" required></textarea>
-                    </label>
-                    <div class="row-actions">
-                        <button class="primary-button" id="submit-button" type="submit">立即记录</button>
+                <form id="capture-form" class="capture-form">
+                    <textarea id="idea-input" name="idea" rows="2" placeholder="记录一条待办，Ctrl+Enter 提交" required></textarea>
+                    <div class="row-actions compact-actions">
+                        <button class="primary-button" id="submit-button" type="submit">记录</button>
                         <button class="secondary-button" id="clear-button" type="button">清空草稿</button>
                     </div>
-                    <p class="helper-text" id="capture-status">准备就绪。</p>
+                    <p class="status-text" id="capture-status"></p>
                 </form>
             </section>
         </main>
+
+        <footer class="utility-bar">
+            <p class="utility-status" id="app-status"></p>
+            <div class="utility-actions">
+                <button class="tool-button pin-toggle-button" id="pin-button" type="button" aria-pressed="false" aria-label="置顶窗口" title="置顶窗口">
+                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                        <path d="M15.6 3.5 20.5 8.4l-2.1 2.1-1.4-1.4-3.2 3.2v3.3l-1.7 1.7-1.2-4.5-4.5-1.2 1.7-1.7h3.3L14.6 6l-1.4-1.4 2.4-1.1z" fill="currentColor"/>
+                    </svg>
+                </button>
+                <div class="settings-shell">
+                    <button class="tool-button settings-button" id="settings-button" type="button" aria-haspopup="menu" aria-expanded="false" aria-label="设置" title="设置">
+                        <svg viewBox="0 0 24 24" aria-hidden="true">
+                            <path d="M10.9 2.9a1 1 0 0 1 2.2 0l.36 1.63a7.68 7.68 0 0 1 1.57.65l1.45-.83a1 1 0 0 1 1.5.87v1.67c.47.37.9.79 1.28 1.26l1.66.01a1 1 0 0 1 .87 1.5l-.84 1.45c.28.5.5 1.03.66 1.58l1.62.35a1 1 0 0 1 0 2.22l-1.62.35a7.6 7.6 0 0 1-.66 1.58l.84 1.45a1 1 0 0 1-.87 1.5l-1.66.02c-.38.46-.81.88-1.28 1.25v1.67a1 1 0 0 1-1.5.87l-1.45-.83a7.68 7.68 0 0 1-1.57.65l-.36 1.63a1 1 0 0 1-2.2 0l-.36-1.63a7.68 7.68 0 0 1-1.57-.65l-1.45.83a1 1 0 0 1-1.5-.87v-1.67a7.93 7.93 0 0 1-1.28-1.25l-1.66-.01a1 1 0 0 1-.87-1.5l.84-1.45a7.6 7.6 0 0 1-.66-1.58l-1.62-.35a1 1 0 0 1 0-2.22l1.62-.35c.16-.55.38-1.08.66-1.58l-.84-1.45a1 1 0 0 1 .87-1.5l1.66-.01c.38-.47.81-.89 1.28-1.26V5.21a1 1 0 0 1 1.5-.87l1.45.83c.5-.28 1.03-.5 1.57-.65zM12 9.2A2.8 2.8 0 1 0 12 14.8 2.8 2.8 0 0 0 12 9.2z" fill="currentColor"/>
+                        </svg>
+                    </button>
+                    <div class="settings-menu hidden" id="settings-menu" role="menu">
+                        <p class="settings-version" id="settings-version">当前版本读取中</p>
+                        <button class="settings-item" id="settings-refresh-button" type="button" role="menuitem">刷新记录</button>
+                        <button class="settings-item" id="settings-version-button" type="button" role="menuitem">检测更新</button>
+                        <button class="settings-item danger" id="settings-logout-button" type="button" role="menuitem">退出登录</button>
+                    </div>
+                </div>
+            </div>
+        </footer>
 
         <div class="dialog-backdrop hidden" id="dialog-backdrop" aria-hidden="true">
             <section class="dialog-card" role="dialog" aria-modal="true" aria-labelledby="dialog-title">

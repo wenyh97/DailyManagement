@@ -1,6 +1,5 @@
 import { invoke } from '@tauri-apps/api/core';
 import { getVersion } from '@tauri-apps/api/app';
-import { getCurrentWindow } from '@tauri-apps/api/window';
 
 const STORAGE_KEYS = {
   apiBase: 'tonybase.desktop.apiBase',
@@ -32,12 +31,10 @@ const elements = {
   settingsVersionButton: document.getElementById('settings-version-button'),
   settingsLogoutButton: document.getElementById('settings-logout-button'),
   pinButton: document.getElementById('pin-button'),
-  minimizeButton: document.getElementById('minimize-button'),
-  closeButton: document.getElementById('close-button'),
   loginStatus: document.getElementById('login-status'),
   captureStatus: document.getElementById('capture-status'),
-  windowStatus: document.getElementById('window-status'),
-  welcomeText: document.getElementById('welcome-text'),
+  appStatus: document.getElementById('app-status'),
+  recentCount: document.getElementById('recent-count'),
   recentList: document.getElementById('recent-list'),
   dialogBackdrop: document.getElementById('dialog-backdrop'),
   dialogTitle: document.getElementById('dialog-title'),
@@ -46,7 +43,6 @@ const elements = {
   dialogConfirmButton: document.getElementById('dialog-confirm-button'),
 };
 
-const currentWindow = getCurrentWindow();
 let isWindowPinned = false;
 let currentAppVersion = '';
 let dialogResolver = null;
@@ -119,9 +115,9 @@ function setCaptureStatus(message, isError = false) {
   elements.captureStatus.style.color = isError ? '#b42318' : '';
 }
 
-function setWindowStatus(message, isError = false) {
-  elements.windowStatus.textContent = message;
-  elements.windowStatus.style.color = isError ? '#b42318' : '';
+function setAppStatus(message, isError = false) {
+  elements.appStatus.textContent = message;
+  elements.appStatus.style.color = isError ? '#b42318' : '';
 }
 
 function setSettingsMenuOpen(open) {
@@ -137,6 +133,14 @@ function updateSettingsActionsState() {
 
 function setSettingsVersionText(message) {
   elements.settingsVersion.textContent = message;
+}
+
+function normalizeRequestError(error) {
+  const message = error?.message || '请求失败';
+  if (/Failed to fetch/i.test(message)) {
+    return '网络连接失败，请检查网络或稍后重试。';
+  }
+  return message;
 }
 
 function showDialog({ title, message, confirmText = '确定', cancelText = '' }) {
@@ -233,7 +237,7 @@ async function fetchDesktopReleaseMetadata() {
 async function checkForUpdates() {
   setSettingsMenuOpen(false);
   elements.settingsVersionButton.disabled = true;
-  setWindowStatus('正在检测新版本...');
+  setAppStatus('正在检测更新...');
 
   try {
     const metadata = await fetchDesktopReleaseMetadata();
@@ -247,7 +251,7 @@ async function checkForUpdates() {
     setSettingsVersionText(`当前版本 ${currentAppVersion}，最新版本 ${latestVersion}`);
 
     if (compareVersions(latestVersion, currentAppVersion) <= 0) {
-      setWindowStatus(`当前已是最新版本 ${currentAppVersion}。`);
+      setAppStatus(`当前已是最新版本 ${currentAppVersion}。`);
       await showDialog({
         title: '已是最新版本',
         message: `当前客户端版本是 ${currentAppVersion}，不需要更新。`,
@@ -263,20 +267,21 @@ async function checkForUpdates() {
     });
 
     if (!shouldUpdate) {
-      setWindowStatus('已取消本次更新。');
+      setAppStatus('已取消更新。');
       return;
     }
 
-    setWindowStatus(`正在准备更新到 ${latestVersion}...`);
+    setAppStatus(`正在准备更新到 ${latestVersion}...`);
     await invoke('download_and_install_update', {
       downloadUrl,
       version: latestVersion,
     });
   } catch (error) {
-    setWindowStatus(error?.message || '版本检测失败。', true);
+    const message = normalizeRequestError(error);
+    setAppStatus(message, true);
     await showDialog({
       title: '更新失败',
-      message: error?.message || '这次没有成功完成版本检测，请稍后重试。',
+      message,
     });
   } finally {
     elements.settingsVersionButton.disabled = false;
@@ -294,7 +299,7 @@ async function initializeWindowControls() {
   setSettingsVersionText(`当前版本 ${currentAppVersion}`);
   updateSettingsActionsState();
   renderPinButton();
-  setWindowStatus('窗口支持拖拽边缘调整大小，也可以手动固定到最上层。');
+  setAppStatus('');
 
   try {
     let pinned = await invoke('get_window_pinned');
@@ -307,14 +312,9 @@ async function initializeWindowControls() {
     isWindowPinned = Boolean(pinned);
     savePinnedPreference(isWindowPinned);
     renderPinButton();
-    setWindowStatus(
-      isWindowPinned
-        ? '窗口已固定在最上层，也支持拖拽边缘调整大小。'
-        : '窗口支持拖拽边缘调整大小，也可以手动固定到最上层。'
-    );
   } catch (error) {
     elements.pinButton.disabled = true;
-    setWindowStatus(error?.message || '当前无法读取窗口状态。', true);
+    setAppStatus(error?.message || '当前无法读取置顶状态。', true);
   }
 }
 
@@ -367,7 +367,8 @@ async function apiRequest(path, options = {}) {
 }
 
 async function fetchRecentIdeas() {
-  elements.recentList.innerHTML = '<li class="empty-state">正在加载最近记录...</li>';
+  elements.recentList.innerHTML = '<li class="empty-state">正在加载...</li>';
+  elements.recentCount.textContent = '...';
 
   try {
     const response = await apiRequest('/ideas');
@@ -376,12 +377,14 @@ async function fetchRecentIdeas() {
     }
 
     const ideas = await response.json();
-    if (!Array.isArray(ideas) || ideas.length === 0) {
-      elements.recentList.innerHTML = '<li class="empty-state">还没有记录，先写下第一条。</li>';
+    const recentIdeas = Array.isArray(ideas) ? ideas.slice(0, 12) : [];
+    elements.recentCount.textContent = String(Array.isArray(ideas) ? ideas.length : 0);
+    if (!recentIdeas.length) {
+      elements.recentList.innerHTML = '<li class="empty-state">还没有待办</li>';
       return;
     }
 
-    elements.recentList.innerHTML = ideas.slice(0, 8).map((idea) => {
+    elements.recentList.innerHTML = recentIdeas.map((idea) => {
       const createdAt = idea.createdAt || idea.created_at || '';
       return `
         <li class="history-item">
@@ -391,6 +394,7 @@ async function fetchRecentIdeas() {
       `;
     }).join('');
   } catch (error) {
+    elements.recentCount.textContent = '0';
     elements.recentList.innerHTML = `<li class="empty-state">${escapeHtml(error.message || '暂时无法加载最近记录。')}</li>`;
   }
 }
@@ -449,15 +453,19 @@ function renderAuthState() {
   updateSettingsActionsState();
 
   if (isAuthenticated) {
-    elements.welcomeText.textContent = `${user.username}，现在可以直接记。`;
-    setCaptureStatus('准备就绪。');
+    setLoginStatus('');
+    setCaptureStatus('');
+    setAppStatus('');
     void fetchRecentIdeas();
     setTimeout(() => elements.ideaInput.focus(), 0);
     return;
   }
 
   elements.passwordInput.value = '';
-  setLoginStatus('首次启动需要登录一次。');
+  elements.recentCount.textContent = '0';
+  setCaptureStatus('');
+  setAppStatus('');
+  setLoginStatus('');
   setTimeout(() => elements.usernameInput.focus(), 0);
 }
 
@@ -487,18 +495,18 @@ elements.captureForm.addEventListener('submit', async (event) => {
   event.preventDefault();
   const text = elements.ideaInput.value.trim();
   if (!text) {
-    setCaptureStatus('请输入一句要记录的内容。', true);
+    setCaptureStatus('请输入待办内容。', true);
     elements.ideaInput.focus();
     return;
   }
 
   elements.submitButton.disabled = true;
-  setCaptureStatus('正在提交...');
+  setCaptureStatus('正在记录...');
 
   try {
     await submitIdea(text);
     elements.ideaInput.value = '';
-    setCaptureStatus('已记录，继续写下一条。');
+    setCaptureStatus('已记录');
     await fetchRecentIdeas();
   } catch (error) {
     setCaptureStatus(error.message || '提交失败', true);
@@ -510,14 +518,14 @@ elements.captureForm.addEventListener('submit', async (event) => {
 
 elements.clearButton.addEventListener('click', () => {
   elements.ideaInput.value = '';
-  setCaptureStatus('输入已清空。');
+  setCaptureStatus('已清空');
   elements.ideaInput.focus();
 });
 
 elements.settingsRefreshButton.addEventListener('click', async () => {
   setSettingsMenuOpen(false);
   await fetchRecentIdeas();
-  setCaptureStatus('最近记录已刷新。');
+  setAppStatus('最近记录已刷新。');
 });
 
 elements.settingsVersionButton.addEventListener('click', async () => {
@@ -545,24 +553,12 @@ elements.pinButton.addEventListener('click', async () => {
     isWindowPinned = Boolean(pinned);
     savePinnedPreference(isWindowPinned);
     renderPinButton();
-    setWindowStatus(
-      isWindowPinned
-        ? '窗口已固定在最上层。'
-        : '窗口已取消置顶，可被其他窗口覆盖。'
-    );
+    setAppStatus(isWindowPinned ? '已置顶' : '已取消置顶');
   } catch (error) {
-    setWindowStatus(error?.message || '置顶设置失败。', true);
+    setAppStatus(error?.message || '置顶设置失败。', true);
   } finally {
     elements.pinButton.disabled = false;
   }
-});
-
-elements.minimizeButton.addEventListener('click', async () => {
-  await currentWindow.minimize();
-});
-
-elements.closeButton.addEventListener('click', async () => {
-  await currentWindow.hide();
 });
 
 elements.dialogConfirmButton.addEventListener('click', () => {
@@ -580,7 +576,7 @@ elements.dialogBackdrop.addEventListener('click', (event) => {
 });
 
 document.addEventListener('click', (event) => {
-  if (!elements.settingsMenu.contains(event.target) && event.target !== elements.settingsButton) {
+  if (!event.target.closest('.settings-shell')) {
     setSettingsMenuOpen(false);
   }
 });
