@@ -8,6 +8,30 @@
 </head>
 <body>
     <div class="app-shell">
+        <aside class="side-toolbar">
+            <div class="toolbar-brand">DM</div>
+            <div class="toolbar-actions">
+                <button class="tool-button pin-toggle-button" id="pin-button" type="button" aria-pressed="false" aria-label="置顶窗口" title="置顶窗口">
+                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                        <path d="M15.6 3.5 20.5 8.4l-2.1 2.1-1.4-1.4-3.2 3.2v3.3l-1.7 1.7-1.2-4.5-4.5-1.2 1.7-1.7h3.3L14.6 6l-1.4-1.4 2.4-1.1z" fill="currentColor"/>
+                    </svg>
+                </button>
+                <div class="settings-shell">
+                    <button class="tool-button settings-button" id="settings-button" type="button" aria-haspopup="menu" aria-expanded="false" aria-label="设置" title="设置">
+                        <svg viewBox="0 0 24 24" aria-hidden="true">
+                            <path d="M10.9 2.9a1 1 0 0 1 2.2 0l.36 1.63a7.68 7.68 0 0 1 1.57.65l1.45-.83a1 1 0 0 1 1.5.87v1.67c.47.37.9.79 1.28 1.26l1.66.01a1 1 0 0 1 .87 1.5l-.84 1.45c.28.5.5 1.03.66 1.58l1.62.35a1 1 0 0 1 0 2.22l-1.62.35a7.6 7.6 0 0 1-.66 1.58l.84 1.45a1 1 0 0 1-.87 1.5l-1.66.02c-.38.46-.81.88-1.28 1.25v1.67a1 1 0 0 1-1.5.87l-1.45-.83a7.68 7.68 0 0 1-1.57.65l-.36 1.63a1 1 0 0 1-2.2 0l-.36-1.63a7.68 7.68 0 0 1-1.57-.65l-1.45.83a1 1 0 0 1-1.5-.87v-1.67a7.93 7.93 0 0 1-1.28-1.25l-1.66-.01a1 1 0 0 1-.87-1.5l.84-1.45a7.6 7.6 0 0 1-.66-1.58l-1.62-.35a1 1 0 0 1 0-2.22l1.62-.35c.16-.55.38-1.08.66-1.58l-.84-1.45a1 1 0 0 1 .87-1.5l1.66-.01c.38-.47.81-.89 1.28-1.26V5.21a1 1 0 0 1 1.5-.87l1.45.83c.5-.28 1.03-.5 1.57-.65zM12 9.2A2.8 2.8 0 1 0 12 14.8 2.8 2.8 0 0 0 12 9.2z" fill="currentColor"/>
+                        </svg>
+                    </button>
+                    <div class="settings-menu hidden" id="settings-menu" role="menu">
+                        <p class="settings-version" id="settings-version">当前版本读取中</p>
+                        <button class="settings-item" id="settings-refresh-button" type="button" role="menuitem">刷新记录</button>
+                        <button class="settings-item" id="settings-version-button" type="button" role="menuitem">检测更新</button>
+                        <button class="settings-item danger" id="settings-logout-button" type="button" role="menuitem">退出登录</button>
+                    </div>
+                </div>
+            </div>
+        </aside>
+
         <main class="panel-stack">
             <section class="panel login-panel" id="login-panel">
                 <div class="panel-header">
@@ -33,53 +57,27 @@
             </section>
 
             <section class="panel hidden capture-panel" id="capture-panel">
-                <section class="history-panel">
-                    <div class="history-header">
-                        <div>
-                            <p class="section-label">DAILY MANAGEMENT</p>
-                            <h1>最近待办</h1>
-                        </div>
-                        <span class="history-count" id="recent-count">0</span>
+                <div class="history-header">
+                    <div class="history-title">
+                        <p class="section-label">DAILY MANAGEMENT</p>
+                        <h1>最近待办</h1>
                     </div>
-                    <ul class="history-list" id="recent-list">
-                        <li class="empty-state">暂无记录</li>
-                    </ul>
-                </section>
+                    <span class="history-count" id="recent-count">0</span>
+                </div>
+
+                <ul class="history-list" id="recent-list">
+                    <li class="empty-state">暂无记录</li>
+                </ul>
 
                 <form id="capture-form" class="capture-form">
                     <textarea id="idea-input" name="idea" rows="2" placeholder="记录一条待办，Ctrl+Enter 提交" required></textarea>
-                    <div class="row-actions compact-actions">
-                        <button class="primary-button" id="submit-button" type="submit">记录</button>
-                        <button class="secondary-button" id="clear-button" type="button">清空草稿</button>
-                    </div>
+                    <button class="primary-button" id="submit-button" type="submit">记录</button>
                     <p class="status-text" id="capture-status"></p>
                 </form>
             </section>
-        </main>
 
-        <footer class="utility-bar">
-            <p class="utility-status" id="app-status"></p>
-            <div class="utility-actions">
-                <button class="tool-button pin-toggle-button" id="pin-button" type="button" aria-pressed="false" aria-label="置顶窗口" title="置顶窗口">
-                    <svg viewBox="0 0 24 24" aria-hidden="true">
-                        <path d="M15.6 3.5 20.5 8.4l-2.1 2.1-1.4-1.4-3.2 3.2v3.3l-1.7 1.7-1.2-4.5-4.5-1.2 1.7-1.7h3.3L14.6 6l-1.4-1.4 2.4-1.1z" fill="currentColor"/>
-                    </svg>
-                </button>
-                <div class="settings-shell">
-                    <button class="tool-button settings-button" id="settings-button" type="button" aria-haspopup="menu" aria-expanded="false" aria-label="设置" title="设置">
-                        <svg viewBox="0 0 24 24" aria-hidden="true">
-                            <path d="M10.9 2.9a1 1 0 0 1 2.2 0l.36 1.63a7.68 7.68 0 0 1 1.57.65l1.45-.83a1 1 0 0 1 1.5.87v1.67c.47.37.9.79 1.28 1.26l1.66.01a1 1 0 0 1 .87 1.5l-.84 1.45c.28.5.5 1.03.66 1.58l1.62.35a1 1 0 0 1 0 2.22l-1.62.35a7.6 7.6 0 0 1-.66 1.58l.84 1.45a1 1 0 0 1-.87 1.5l-1.66.02c-.38.46-.81.88-1.28 1.25v1.67a1 1 0 0 1-1.5.87l-1.45-.83a7.68 7.68 0 0 1-1.57.65l-.36 1.63a1 1 0 0 1-2.2 0l-.36-1.63a7.68 7.68 0 0 1-1.57-.65l-1.45.83a1 1 0 0 1-1.5-.87v-1.67a7.93 7.93 0 0 1-1.28-1.25l-1.66-.01a1 1 0 0 1-.87-1.5l.84-1.45a7.6 7.6 0 0 1-.66-1.58l-1.62-.35a1 1 0 0 1 0-2.22l1.62-.35c.16-.55.38-1.08.66-1.58l-.84-1.45a1 1 0 0 1 .87-1.5l1.66-.01c.38-.47.81-.89 1.28-1.26V5.21a1 1 0 0 1 1.5-.87l1.45.83c.5-.28 1.03-.5 1.57-.65zM12 9.2A2.8 2.8 0 1 0 12 14.8 2.8 2.8 0 0 0 12 9.2z" fill="currentColor"/>
-                        </svg>
-                    </button>
-                    <div class="settings-menu hidden" id="settings-menu" role="menu">
-                        <p class="settings-version" id="settings-version">当前版本读取中</p>
-                        <button class="settings-item" id="settings-refresh-button" type="button" role="menuitem">刷新记录</button>
-                        <button class="settings-item" id="settings-version-button" type="button" role="menuitem">检测更新</button>
-                        <button class="settings-item danger" id="settings-logout-button" type="button" role="menuitem">退出登录</button>
-                    </div>
-                </div>
-            </div>
-        </footer>
+            <p class="app-status" id="app-status"></p>
+        </main>
 
         <div class="dialog-backdrop hidden" id="dialog-backdrop" aria-hidden="true">
             <section class="dialog-card" role="dialog" aria-modal="true" aria-labelledby="dialog-title">

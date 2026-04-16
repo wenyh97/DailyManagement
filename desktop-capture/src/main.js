@@ -23,7 +23,6 @@ const elements = {
   ideaInput: document.getElementById('idea-input'),
   loginButton: document.getElementById('login-button'),
   submitButton: document.getElementById('submit-button'),
-  clearButton: document.getElementById('clear-button'),
   settingsButton: document.getElementById('settings-button'),
   settingsMenu: document.getElementById('settings-menu'),
   settingsVersion: document.getElementById('settings-version'),
@@ -208,30 +207,7 @@ function compareVersions(left, right) {
 }
 
 async function fetchDesktopReleaseMetadata() {
-  const errors = [];
-
-  for (const metadataUrl of getDesktopMetadataUrls()) {
-    try {
-      const response = await fetch(metadataUrl, {
-        cache: 'no-store',
-      });
-
-      if (!response.ok) {
-        throw new Error(`请求失败（${response.status}）`);
-      }
-
-      const metadata = await response.json();
-      if (!metadata || !metadata.version) {
-        throw new Error('版本信息格式不完整。');
-      }
-
-      return metadata;
-    } catch (error) {
-      errors.push(`${metadataUrl}：${error?.message || '请求失败'}`);
-    }
-  }
-
-  throw new Error(`暂时无法获取版本信息。\n${errors[0] || '请检查网络或稍后重试。'}`);
+  return invoke('fetch_update_metadata', { candidates: getDesktopMetadataUrls() });
 }
 
 async function checkForUpdates() {
@@ -516,12 +492,6 @@ elements.captureForm.addEventListener('submit', async (event) => {
   }
 });
 
-elements.clearButton.addEventListener('click', () => {
-  elements.ideaInput.value = '';
-  setCaptureStatus('已清空');
-  elements.ideaInput.focus();
-});
-
 elements.settingsRefreshButton.addEventListener('click', async () => {
   setSettingsMenuOpen(false);
   await fetchRecentIdeas();
@@ -597,6 +567,14 @@ elements.ideaInput.addEventListener('keydown', async (event) => {
     event.preventDefault();
     elements.captureForm.requestSubmit();
   }
+});
+
+document.documentElement.addEventListener('mouseenter', () => {
+  void invoke('handle_window_hover', { hovering: true }).catch(() => {});
+});
+
+document.documentElement.addEventListener('mouseleave', () => {
+  void invoke('handle_window_hover', { hovering: false }).catch(() => {});
 });
 
 void initializeWindowControls();
