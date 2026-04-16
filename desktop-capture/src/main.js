@@ -11,6 +11,11 @@ const STORAGE_KEYS = {
 const DEFAULT_API_BASE = 'https://dailymanagement.tonybase.site';
 const DEFAULT_UPDATE_BASE = 'https://dailymanagement.tonybase.site';
 const DESKTOP_METADATA_PATH = '/downloads/metadata/desktop-latest.json';
+const VIEW_MODES = {
+  active: 'active',
+  archive: 'archive',
+};
+const SYNC_INTERVAL_MS = 30000;
 
 const elements = {
   loginPanel: document.getElementById('login-panel'),
@@ -30,6 +35,10 @@ const elements = {
   settingsVersionButton: document.getElementById('settings-version-button'),
   settingsLogoutButton: document.getElementById('settings-logout-button'),
   pinButton: document.getElementById('pin-button'),
+  syncButton: document.getElementById('sync-button'),
+  viewActiveButton: document.getElementById('view-active-button'),
+  viewArchiveButton: document.getElementById('view-archive-button'),
+  viewTitle: document.getElementById('view-title'),
   loginStatus: document.getElementById('login-status'),
   captureStatus: document.getElementById('capture-status'),
   appStatus: document.getElementById('app-status'),
@@ -42,9 +51,16 @@ const elements = {
   dialogConfirmButton: document.getElementById('dialog-confirm-button'),
 };
 
-let isWindowPinned = false;
-let currentAppVersion = '';
-let dialogResolver = null;
+const state = {
+  isWindowPinned: false,
+  currentAppVersion: '',
+  dialogResolver: null,
+  currentView: VIEW_MODES.active,
+  ideas: [],
+  events: [],
+  syncIntervalId: null,
+  isSyncing: false,
+};
 
 function normalizeApiBase(value) {
   if (!value || typeof value !== 'string') {
@@ -104,6 +120,53 @@ function savePinnedPreference(pinned) {
   localStorage.setItem(STORAGE_KEYS.pinned, String(Boolean(pinned)));
 }
 
+function escapeHtml(value) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function parseTimestamp(value) {
+  if (!value) {
+    return 0;
+  }
+
+  const timestamp = new Date(value).getTime();
+  return Number.isFinite(timestamp) ? timestamp : 0;
+}
+
+function formatTime(value) {
+  try {
+    return new Date(value).toLocaleString('zh-CN', {
+      month: 'numeric',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  } catch {
+    return value || '';
+  }
+}
+
+function isIdeaCompleted(idea) {
+  return Boolean(idea?.isCompleted || idea?.is_completed);
+}
+
+function isEventCompleted(event) {
+  return Boolean(event?.isCompleted || event?.is_completed);
+}
+
+function getIdeaCompletedAt(idea) {
+  return idea?.completedAt || idea?.completed_at || idea?.createdAt || idea?.created_at || '';
+}
+
+function getEventCompletedAt(event) {
+  return event?.end || event?.start || '';
+}
+
 function setLoginStatus(message, isError = false) {
   elements.loginStatus.textContent = message;
   elements.loginStatus.style.color = isError ? '#b42318' : '';
@@ -124,10 +187,13 @@ function setSettingsMenuOpen(open) {
   elements.settingsButton.setAttribute('aria-expanded', String(open));
 }
 
-function updateSettingsActionsState() {
+function updateActionStates() {
   const isAuthenticated = Boolean(getToken() && getUser());
   elements.settingsRefreshButton.disabled = !isAuthenticated;
   elements.settingsLogoutButton.disabled = !isAuthenticated;
+  elements.syncButton.disabled = !isAuthenticated || state.isSyncing;
+  elements.viewActiveButton.disabled = !isAuthenticated;
+  elements.viewArchiveButton.disabled = !isAuthenticated;
 }
 
 function setSettingsVersionText(message) {
@@ -152,7 +218,7 @@ function showDialog({ title, message, confirmText = '确定', cancelText = '' })
   elements.dialogBackdrop.setAttribute('aria-hidden', 'false');
 
   return new Promise((resolve) => {
-    dialogResolver = resolve;
+    state.dialogResolver = resolve;
   });
 }
 
@@ -160,9 +226,9 @@ function closeDialog(confirmed) {
   elements.dialogBackdrop.classList.add('hidden');
   elements.dialogBackdrop.setAttribute('aria-hidden', 'true');
 
-  if (dialogResolver) {
-    const resolve = dialogResolver;
-    dialogResolver = null;
+  if (state.dialogResolver) {
+    const resolve = state.dialogResolver;
+    state.dialogResolver = null;
     resolve(confirmed);
   }
 }
@@ -175,7 +241,7 @@ function getDesktopMetadataUrls() {
       const normalizedBase = normalizeApiBase(baseUrl);
       candidates.push(new URL(DESKTOP_METADATA_PATH, `${normalizedBase}/`).toString());
     } catch {
-      // Ignore invalid URLs and continue with remaining candidates.
+      // Ignore invalid URLs and continue.
     }
   };
 
@@ -224,20 +290,20 @@ async function checkForUpdates() {
       throw new Error('服务器返回了版本号，但没有可用下载地址。');
     }
 
-    setSettingsVersionText(`当前版本 ${currentAppVersion}，最新版本 ${latestVersion}`);
+    setSettingsVersionText(`当前版本 ${state.currentAppVersion}，最新版本 ${latestVersion}`);
 
-    if (compareVersions(latestVersion, currentAppVersion) <= 0) {
-      setAppStatus(`当前已是最新版本 ${currentAppVersion}。`);
+    if (compareVersions(latestVersion, state.currentAppVersion) <= 0) {
+      setAppStatus(`当前已是最新版本 ${state.currentAppVersion}。`);
       await showDialog({
         title: '已是最新版本',
-        message: `当前客户端版本是 ${currentAppVersion}，不需要更新。`,
+        message: `当前客户端版本是 ${state.currentAppVersion}，不需要更新。`,
       });
       return;
     }
 
     const shouldUpdate = await showDialog({
       title: `发现新版本 ${latestVersion}`,
-      message: `当前版本 ${currentAppVersion}\n新版本 ${latestVersion}\n\n点击“立即更新”后，客户端会下载新版安装包并自动启动安装。`,
+      message: `当前版本 ${state.currentAppVersion}\n新版本 ${latestVersion}\n\n点击“立即更新”后，客户端会下载新版安装包并自动启动安装。`,
       confirmText: '立即更新',
       cancelText: '稍后',
     });
@@ -265,55 +331,134 @@ async function checkForUpdates() {
 }
 
 function renderPinButton() {
-  elements.pinButton.setAttribute('aria-pressed', String(isWindowPinned));
-  elements.pinButton.setAttribute('aria-label', isWindowPinned ? '取消置顶' : '置顶窗口');
-  elements.pinButton.title = isWindowPinned ? '取消置顶' : '置顶窗口';
+  elements.pinButton.setAttribute('aria-pressed', String(state.isWindowPinned));
+  elements.pinButton.setAttribute('aria-label', state.isWindowPinned ? '取消置顶' : '置顶窗口');
+  elements.pinButton.title = state.isWindowPinned ? '取消置顶' : '置顶窗口';
 }
 
-async function initializeWindowControls() {
-  currentAppVersion = await getVersion();
-  setSettingsVersionText(`当前版本 ${currentAppVersion}`);
-  updateSettingsActionsState();
-  renderPinButton();
-  setAppStatus('');
+function renderSyncButton() {
+  elements.syncButton.classList.toggle('is-syncing', state.isSyncing);
+  elements.syncButton.disabled = state.isSyncing || !Boolean(getToken() && getUser());
+}
 
-  try {
-    let pinned = await invoke('get_window_pinned');
-    const preferredPinned = getPinnedPreference();
+function renderViewButtons() {
+  elements.viewActiveButton.classList.toggle('is-active', state.currentView === VIEW_MODES.active);
+  elements.viewArchiveButton.classList.toggle('is-active', state.currentView === VIEW_MODES.archive);
+}
 
-    if (preferredPinned !== pinned) {
-      pinned = await invoke('set_window_pinned', { pinned: preferredPinned });
+function setCurrentView(view) {
+  state.currentView = view;
+  renderDashboard();
+}
+
+function renderEmptyState(message) {
+  elements.recentList.innerHTML = `<li class="empty-state">${escapeHtml(message)}</li>`;
+}
+
+function buildPendingIdeaMarkup(idea) {
+  const createdAt = idea.createdAt || idea.created_at || '';
+  return `
+    <li class="history-item todo" data-kind="idea" data-id="${escapeHtml(idea.id)}">
+      <label class="item-check" aria-label="完成待办">
+        <input class="todo-toggle" type="checkbox" data-kind="idea" data-id="${escapeHtml(idea.id)}">
+        <span class="item-check-mark"></span>
+      </label>
+      <div class="item-body">
+        <p>${escapeHtml(idea.text || '')}</p>
+        <time>${escapeHtml(formatTime(createdAt))}</time>
+      </div>
+      <span class="item-meta todo">待办</span>
+    </li>
+  `;
+}
+
+function buildArchivedIdeaMarkup(idea) {
+  const completedAt = getIdeaCompletedAt(idea);
+  return `
+    <li class="history-item archived todo" data-kind="idea" data-id="${escapeHtml(idea.id)}">
+      <label class="item-check" aria-label="取消完成">
+        <input class="todo-toggle" type="checkbox" checked data-kind="idea" data-id="${escapeHtml(idea.id)}">
+        <span class="item-check-mark"></span>
+      </label>
+      <div class="item-body">
+        <p>${escapeHtml(idea.text || '')}</p>
+        <time>完成于 ${escapeHtml(formatTime(completedAt))}</time>
+      </div>
+      <span class="item-meta todo">待办</span>
+    </li>
+  `;
+}
+
+function buildArchivedEventMarkup(event) {
+  const completedAt = getEventCompletedAt(event);
+  return `
+    <li class="history-item archived event" data-kind="event" data-id="${escapeHtml(event.id)}">
+      <div class="item-body">
+        <p>${escapeHtml(event.title || '已完成事件')}</p>
+        <time>完成于 ${escapeHtml(formatTime(completedAt))}</time>
+      </div>
+      <span class="item-meta event">日程</span>
+    </li>
+  `;
+}
+
+function getPendingIdeas() {
+  return state.ideas.filter((idea) => !isIdeaCompleted(idea));
+}
+
+function getArchivedIdeas() {
+  return state.ideas
+    .filter((idea) => isIdeaCompleted(idea))
+    .sort((left, right) => parseTimestamp(getIdeaCompletedAt(right)) - parseTimestamp(getIdeaCompletedAt(left)));
+}
+
+function getArchivedEvents() {
+  return state.events
+    .filter((event) => isEventCompleted(event))
+    .sort((left, right) => parseTimestamp(getEventCompletedAt(right)) - parseTimestamp(getEventCompletedAt(left)));
+}
+
+function renderDashboard() {
+  renderViewButtons();
+  renderSyncButton();
+
+  if (state.currentView === VIEW_MODES.active) {
+    const pendingIdeas = getPendingIdeas();
+    elements.viewTitle.textContent = '最近待办';
+    elements.recentCount.textContent = String(pendingIdeas.length);
+    elements.captureForm.classList.remove('hidden');
+
+    if (!pendingIdeas.length) {
+      renderEmptyState('还没有待办');
+      return;
     }
 
-    isWindowPinned = Boolean(pinned);
-    savePinnedPreference(isWindowPinned);
-    renderPinButton();
-  } catch (error) {
-    elements.pinButton.disabled = true;
-    setAppStatus(error?.message || '当前无法读取置顶状态。', true);
+    elements.recentList.innerHTML = pendingIdeas.map(buildPendingIdeaMarkup).join('');
+    return;
   }
-}
 
-function escapeHtml(value) {
-  return String(value)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
-}
+  const archivedIdeas = getArchivedIdeas().map((idea) => ({
+    kind: 'idea',
+    timestamp: parseTimestamp(getIdeaCompletedAt(idea)),
+    markup: buildArchivedIdeaMarkup(idea),
+  }));
+  const archivedEvents = getArchivedEvents().map((event) => ({
+    kind: 'event',
+    timestamp: parseTimestamp(getEventCompletedAt(event)),
+    markup: buildArchivedEventMarkup(event),
+  }));
+  const archivedItems = [...archivedIdeas, ...archivedEvents].sort((left, right) => right.timestamp - left.timestamp);
 
-function formatTime(value) {
-  try {
-    return new Date(value).toLocaleString('zh-CN', {
-      month: 'numeric',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
-  } catch {
-    return value || '';
+  elements.viewTitle.textContent = '待办收纳箱';
+  elements.recentCount.textContent = String(archivedItems.length);
+  elements.captureForm.classList.add('hidden');
+
+  if (!archivedItems.length) {
+    renderEmptyState('还没有已完成的待办或日程');
+    return;
   }
+
+  elements.recentList.innerHTML = archivedItems.map((item) => item.markup).join('');
 }
 
 async function apiRequest(path, options = {}) {
@@ -342,37 +487,70 @@ async function apiRequest(path, options = {}) {
   return response;
 }
 
-async function fetchRecentIdeas() {
-  elements.recentList.innerHTML = '<li class="empty-state">正在加载...</li>';
-  elements.recentCount.textContent = '...';
+async function syncDashboard(showStatus = false) {
+  if (!getToken() || !getUser() || state.isSyncing) {
+    return;
+  }
+
+  state.isSyncing = true;
+  renderSyncButton();
+
+  if (showStatus) {
+    setAppStatus('同步中...');
+  }
 
   try {
-    const response = await apiRequest('/ideas');
-    if (!response.ok) {
-      throw new Error('加载最近记录失败');
+    const [ideasResponse, eventsResponse] = await Promise.all([
+      apiRequest('/ideas'),
+      apiRequest('/events'),
+    ]);
+
+    if (!ideasResponse.ok) {
+      throw new Error('加载待办失败');
     }
 
-    const ideas = await response.json();
-    const recentIdeas = Array.isArray(ideas) ? ideas.slice(0, 12) : [];
-    elements.recentCount.textContent = String(Array.isArray(ideas) ? ideas.length : 0);
-    if (!recentIdeas.length) {
-      elements.recentList.innerHTML = '<li class="empty-state">还没有待办</li>';
-      return;
+    if (!eventsResponse.ok) {
+      throw new Error('加载事件失败');
     }
 
-    elements.recentList.innerHTML = recentIdeas.map((idea) => {
-      const createdAt = idea.createdAt || idea.created_at || '';
-      return `
-        <li class="history-item">
-          <p>${escapeHtml(idea.text || '')}</p>
-          <time>${escapeHtml(formatTime(createdAt))}</time>
-        </li>
-      `;
-    }).join('');
+    const [ideas, events] = await Promise.all([
+      ideasResponse.json(),
+      eventsResponse.json(),
+    ]);
+
+    state.ideas = Array.isArray(ideas) ? ideas : [];
+    state.events = Array.isArray(events) ? events : [];
+    renderDashboard();
+
+    if (showStatus) {
+      setAppStatus('已同步');
+    }
   } catch (error) {
-    elements.recentCount.textContent = '0';
-    elements.recentList.innerHTML = `<li class="empty-state">${escapeHtml(error.message || '暂时无法加载最近记录。')}</li>`;
+    const message = normalizeRequestError(error);
+    setAppStatus(message, true);
+    if (!state.ideas.length && !state.events.length) {
+      renderEmptyState(message);
+      elements.recentCount.textContent = '0';
+    }
+  } finally {
+    state.isSyncing = false;
+    renderSyncButton();
   }
+}
+
+function ensureSyncTimer(isAuthenticated) {
+  if (state.syncIntervalId) {
+    window.clearInterval(state.syncIntervalId);
+    state.syncIntervalId = null;
+  }
+
+  if (!isAuthenticated) {
+    return;
+  }
+
+  state.syncIntervalId = window.setInterval(() => {
+    void syncDashboard(false);
+  }, SYNC_INTERVAL_MS);
 }
 
 async function login(username, password) {
@@ -390,7 +568,7 @@ async function login(username, password) {
       const payload = await response.json();
       message = payload.error || message;
     } catch {
-      // Ignore JSON parse failures and keep fallback text.
+      // Keep fallback message.
     }
     throw new Error(message);
   }
@@ -410,7 +588,27 @@ async function submitIdea(text) {
       const payload = await response.json();
       message = payload.error || message;
     } catch {
-      // Ignore JSON parse failures and keep fallback text.
+      // Keep fallback message.
+    }
+    throw new Error(message);
+  }
+
+  return response.json();
+}
+
+async function updateIdeaCompletion(ideaId, nextCompleted) {
+  const response = await apiRequest(`/ideas/${ideaId}`, {
+    method: 'PUT',
+    body: JSON.stringify({ isCompleted: nextCompleted }),
+  });
+
+  if (!response.ok) {
+    let message = '更新待办状态失败';
+    try {
+      const payload = await response.json();
+      message = payload.error || message;
+    } catch {
+      // Keep fallback message.
     }
     throw new Error(message);
   }
@@ -426,23 +624,53 @@ function renderAuthState() {
   elements.loginPanel.classList.toggle('hidden', isAuthenticated);
   elements.capturePanel.classList.toggle('hidden', !isAuthenticated);
   elements.apiBaseInput.value = getApiBase();
-  updateSettingsActionsState();
+  updateActionStates();
+  renderDashboard();
+  ensureSyncTimer(isAuthenticated);
 
   if (isAuthenticated) {
     setLoginStatus('');
     setCaptureStatus('');
     setAppStatus('');
-    void fetchRecentIdeas();
-    setTimeout(() => elements.ideaInput.focus(), 0);
+    void syncDashboard(false);
+    window.setTimeout(() => elements.ideaInput.focus(), 0);
     return;
   }
 
   elements.passwordInput.value = '';
+  state.ideas = [];
+  state.events = [];
   elements.recentCount.textContent = '0';
   setCaptureStatus('');
   setAppStatus('');
   setLoginStatus('');
-  setTimeout(() => elements.usernameInput.focus(), 0);
+  renderEmptyState('暂无记录');
+  window.setTimeout(() => elements.usernameInput.focus(), 0);
+}
+
+async function initializeWindowControls() {
+  state.currentAppVersion = await getVersion();
+  setSettingsVersionText(`当前版本 ${state.currentAppVersion}`);
+  updateActionStates();
+  renderSyncButton();
+  renderViewButtons();
+  renderPinButton();
+
+  try {
+    let pinned = await invoke('get_window_pinned');
+    const preferredPinned = getPinnedPreference();
+
+    if (preferredPinned !== pinned) {
+      pinned = await invoke('set_window_pinned', { pinned: preferredPinned });
+    }
+
+    state.isWindowPinned = Boolean(pinned);
+    savePinnedPreference(state.isWindowPinned);
+    renderPinButton();
+  } catch (error) {
+    elements.pinButton.disabled = true;
+    setAppStatus(error?.message || '当前无法读取置顶状态。', true);
+  }
 }
 
 elements.loginForm.addEventListener('submit', async (event) => {
@@ -483,7 +711,7 @@ elements.captureForm.addEventListener('submit', async (event) => {
     await submitIdea(text);
     elements.ideaInput.value = '';
     setCaptureStatus('已记录');
-    await fetchRecentIdeas();
+    await syncDashboard(false);
   } catch (error) {
     setCaptureStatus(error.message || '提交失败', true);
   } finally {
@@ -492,10 +720,43 @@ elements.captureForm.addEventListener('submit', async (event) => {
   }
 });
 
+elements.recentList.addEventListener('change', async (event) => {
+  const checkbox = event.target.closest('.todo-toggle');
+  if (!checkbox) {
+    return;
+  }
+
+  const ideaId = checkbox.dataset.id;
+  const nextCompleted = checkbox.checked;
+  checkbox.disabled = true;
+
+  try {
+    await updateIdeaCompletion(ideaId, nextCompleted);
+    setAppStatus(nextCompleted ? '已完成待办' : '已恢复待办');
+    await syncDashboard(false);
+  } catch (error) {
+    checkbox.checked = !nextCompleted;
+    setAppStatus(error.message || '更新待办状态失败', true);
+  } finally {
+    checkbox.disabled = false;
+  }
+});
+
+elements.viewActiveButton.addEventListener('click', () => {
+  setCurrentView(VIEW_MODES.active);
+});
+
+elements.viewArchiveButton.addEventListener('click', () => {
+  setCurrentView(VIEW_MODES.archive);
+});
+
+elements.syncButton.addEventListener('click', async () => {
+  await syncDashboard(true);
+});
+
 elements.settingsRefreshButton.addEventListener('click', async () => {
   setSettingsMenuOpen(false);
-  await fetchRecentIdeas();
-  setAppStatus('最近记录已刷新。');
+  await syncDashboard(true);
 });
 
 elements.settingsVersionButton.addEventListener('click', async () => {
@@ -519,11 +780,11 @@ elements.pinButton.addEventListener('click', async () => {
   elements.pinButton.disabled = true;
 
   try {
-    const pinned = await invoke('set_window_pinned', { pinned: !isWindowPinned });
-    isWindowPinned = Boolean(pinned);
-    savePinnedPreference(isWindowPinned);
+    const pinned = await invoke('set_window_pinned', { pinned: !state.isWindowPinned });
+    state.isWindowPinned = Boolean(pinned);
+    savePinnedPreference(state.isWindowPinned);
     renderPinButton();
-    setAppStatus(isWindowPinned ? '已置顶' : '已取消置顶');
+    setAppStatus(state.isWindowPinned ? '已置顶' : '已取消置顶');
   } catch (error) {
     setAppStatus(error?.message || '置顶设置失败。', true);
   } finally {
@@ -562,7 +823,7 @@ document.addEventListener('keydown', (event) => {
   }
 });
 
-elements.ideaInput.addEventListener('keydown', async (event) => {
+elements.ideaInput.addEventListener('keydown', (event) => {
   if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') {
     event.preventDefault();
     elements.captureForm.requestSubmit();
@@ -577,5 +838,6 @@ document.documentElement.addEventListener('mouseleave', () => {
   void invoke('handle_window_hover', { hovering: false }).catch(() => {});
 });
 
+renderDashboard();
 void initializeWindowControls();
 renderAuthState();

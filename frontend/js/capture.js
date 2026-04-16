@@ -90,12 +90,16 @@
     }
 
     function renderRecent(ideas) {
-        if (!Array.isArray(ideas) || !ideas.length) {
+        const activeIdeas = Array.isArray(ideas)
+            ? ideas.filter((item) => !(item.isCompleted || item.is_completed))
+            : [];
+
+        if (!activeIdeas.length) {
             recentList.innerHTML = '<li class="empty-state">还没有收进来的待办，先写下第一条。</li>';
             return;
         }
 
-        recentList.innerHTML = ideas.slice(0, MAX_RECENT_ITEMS).map((item) => `
+        recentList.innerHTML = activeIdeas.slice(0, MAX_RECENT_ITEMS).map((item) => `
             <li class="capture-item">
                 <span class="capture-time">${formatShortTime(item.createdAt || item.created_at || '')}</span>
                 <div class="capture-body">

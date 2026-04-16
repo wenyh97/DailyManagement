@@ -9,8 +9,30 @@
 <body>
     <div class="app-shell">
         <aside class="side-toolbar">
-            <div class="toolbar-brand">DM</div>
-            <div class="toolbar-actions">
+            <div class="toolbar-main">
+                <div class="toolbar-brand">DM</div>
+                <div class="toolbar-actions">
+                    <button class="tool-button is-active" id="view-active-button" type="button" aria-label="最近待办" title="最近待办">
+                        <svg viewBox="0 0 24 24" aria-hidden="true">
+                            <path d="M7 7h10M7 12h10M7 17h6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+                        </svg>
+                    </button>
+                    <button class="tool-button" id="view-archive-button" type="button" aria-label="待办收纳箱" title="待办收纳箱">
+                        <svg viewBox="0 0 24 24" aria-hidden="true">
+                            <path d="M5 7.5h14v3H5zm1 4.5h12v6H6z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>
+                            <path d="M10 11v2h4v-2" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+                        </svg>
+                    </button>
+                    <button class="tool-button" id="sync-button" type="button" aria-label="同步数据" title="同步数据">
+                        <svg viewBox="0 0 24 24" aria-hidden="true">
+                            <path d="M17.5 8A6 6 0 0 0 7.3 6.3L5.5 8.1M6.5 16A6 6 0 0 0 16.7 17.7l1.8-1.8" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+                            <path d="M5.5 4.8v3.3h3.3M18.5 19.2v-3.3h-3.3" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+
+            <div class="toolbar-footer">
                 <button class="tool-button pin-toggle-button" id="pin-button" type="button" aria-pressed="false" aria-label="置顶窗口" title="置顶窗口">
                     <svg viewBox="0 0 24 24" aria-hidden="true">
                         <path d="M15.6 3.5 20.5 8.4l-2.1 2.1-1.4-1.4-3.2 3.2v3.3l-1.7 1.7-1.2-4.5-4.5-1.2 1.7-1.7h3.3L14.6 6l-1.4-1.4 2.4-1.1z" fill="currentColor"/>
@@ -60,7 +82,7 @@
                 <div class="history-header">
                     <div class="history-title">
                         <p class="section-label">DAILY MANAGEMENT</p>
-                        <h1>最近待办</h1>
+                        <h1 id="view-title">最近待办</h1>
                     </div>
                     <span class="history-count" id="recent-count">0</span>
                 </div>
