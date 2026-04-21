@@ -3021,10 +3021,17 @@ document.addEventListener('DOMContentLoaded', () => { // 监听页面加载完�
         getIdeaContainers().forEach((container) => {
             container.querySelectorAll('.idea-item-menu').forEach((menu) => {
                 const wrapper = menu.closest('.idea-menu-shell');
+                const item = wrapper ? wrapper.closest('.idea-item') : null;
                 const button = wrapper ? wrapper.querySelector('.idea-menu-toggle') : null;
                 const currentId = wrapper?.dataset?.id || '';
                 const shouldOpen = safeId && currentId === safeId;
                 menu.hidden = !shouldOpen;
+                if (wrapper) {
+                    wrapper.classList.toggle('is-open', shouldOpen);
+                }
+                if (item) {
+                    item.classList.toggle('is-menu-open', shouldOpen);
+                }
                 if (button) {
                     button.setAttribute('aria-expanded', String(shouldOpen));
                 }
