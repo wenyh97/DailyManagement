@@ -303,6 +303,61 @@ body {
     gap: 8px;
 }
 
+.capture-swipe-item {
+    --swipe-offset: 0px;
+    position: relative;
+    overflow: hidden;
+    border-radius: 18px;
+}
+
+.capture-item-actions {
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: 148px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    padding: 6px;
+    border-radius: 18px;
+    background: linear-gradient(135deg, rgba(226, 232, 240, 0.6) 0%, rgba(203, 213, 225, 0.68) 100%);
+}
+
+.capture-action-button {
+    border: none;
+    border-radius: 14px;
+    color: #fff;
+    font: inherit;
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.16);
+}
+
+.capture-action-complete {
+    background: linear-gradient(180deg, #14b8a6 0%, #0f766e 100%);
+}
+
+.capture-action-delete {
+    background: linear-gradient(180deg, #fb7185 0%, #e11d48 100%);
+}
+
+.capture-item-sheet {
+    transform: translateX(var(--swipe-offset));
+    transition: transform 0.22s ease, box-shadow 0.22s ease;
+    will-change: transform;
+    touch-action: pan-y;
+}
+
+.capture-swipe-item.is-open .capture-item-sheet {
+    box-shadow: 0 14px 26px rgba(15, 23, 42, 0.12);
+}
+
+.capture-swipe-item.is-swiping .capture-item-sheet {
+    transition: none;
+}
+
 .capture-item,
 .empty-state {
     border-radius: 16px;
@@ -432,6 +487,20 @@ body {
     .capture-item {
         grid-template-columns: 1fr;
         gap: 8px;
+    }
+
+    .capture-swipe-item {
+        border-radius: 20px;
+    }
+
+    .capture-item-actions {
+        width: 148px;
+        padding: 7px;
+    }
+
+    .capture-action-button {
+        border-radius: 16px;
+        font-size: 12px;
     }
 
     .capture-item::before {

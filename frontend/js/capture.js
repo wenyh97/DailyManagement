@@ -24,7 +24,10 @@
     const networkStatus = document.getElementById('network-status');
     const syncStatus = document.getElementById('sync-status');
     const captureHelp = document.getElementById('capture-help');
+    const SWIPE_ACTION_WIDTH = 148;
     let activeView = loadView();
+    let ideasCache = [];
+    let openSwipeId = '';
 
     function saveDraft(value) {
         localStorage.setItem(DRAFT_STORAGE_KEY, value);
@@ -91,6 +94,142 @@
         return Number.isFinite(time) ? time : 0;
     }
 
+    function closeSwipeActions(exceptId = '') {
+        const safeId = String(exceptId || '');
+        openSwipeId = safeId;
+        recentList.querySelectorAll('.capture-swipe-item').forEach((item) => {
+            const shouldOpen = safeId && item.dataset.id === safeId;
+            item.classList.toggle('is-open', shouldOpen);
+            item.style.setProperty('--swipe-offset', shouldOpen ? `-${SWIPE_ACTION_WIDTH}px` : '0px');
+        });
+    }
+
+    function buildSwipeItemMarkup(item) {
+        const itemId = escapeHtml(item.id || '');
+        return `
+            <li class="capture-swipe-item" data-id="${itemId}" style="--swipe-offset: 0px;">
+                <div class="capture-item-actions" aria-hidden="true">
+                    <button type="button" class="capture-action-button capture-action-complete" data-action="complete" data-id="${itemId}">完成</button>
+                    <button type="button" class="capture-action-button capture-action-delete" data-action="delete" data-id="${itemId}">删除</button>
+                </div>
+                <div class="capture-item capture-item-sheet" data-swipe-sheet="true">
+                    <span class="capture-time">${formatShortTime(item.createdAt || item.created_at || '')}</span>
+                    <div class="capture-body">
+                        <p>${escapeHtml(item.text || '')}</p>
+                        <time>${formatTime(item.createdAt || item.created_at || '')}</time>
+                    </div>
+                </div>
+            </li>
+        `;
+    }
+
+    function bindSwipeGestures() {
+        const swipeItems = recentList.querySelectorAll('.capture-swipe-item');
+        swipeItems.forEach((item) => {
+            const sheet = item.querySelector('[data-swipe-sheet]');
+            if (!sheet) {
+                return;
+            }
+
+            let startX = 0;
+            let startY = 0;
+            let currentOffset = 0;
+            let dragOffset = 0;
+            let isDragging = false;
+            let isHorizontal = false;
+
+            const applyOffset = (offset) => {
+                const limitedOffset = Math.max(-SWIPE_ACTION_WIDTH, Math.min(0, offset));
+                dragOffset = limitedOffset;
+                item.style.setProperty('--swipe-offset', `${limitedOffset}px`);
+            };
+
+            sheet.addEventListener('touchstart', (event) => {
+                const touch = event.touches[0];
+                startX = touch.clientX;
+                startY = touch.clientY;
+                currentOffset = item.classList.contains('is-open') ? -SWIPE_ACTION_WIDTH : 0;
+                dragOffset = currentOffset;
+                isDragging = true;
+                isHorizontal = false;
+                if (!item.classList.contains('is-open')) {
+                    closeSwipeActions();
+                }
+                item.classList.add('is-swiping');
+            }, { passive: true });
+
+            sheet.addEventListener('touchmove', (event) => {
+                if (!isDragging) {
+                    return;
+                }
+                const touch = event.touches[0];
+                const deltaX = touch.clientX - startX;
+                const deltaY = touch.clientY - startY;
+
+                if (!isHorizontal) {
+                    if (Math.abs(deltaY) > 10 && Math.abs(deltaY) > Math.abs(deltaX)) {
+                        isDragging = false;
+                        item.classList.remove('is-swiping');
+                        item.style.setProperty('--swipe-offset', `${currentOffset}px`);
+                        return;
+                    }
+                    if (Math.abs(deltaX) < 8) {
+                        return;
+                    }
+                    isHorizontal = Math.abs(deltaX) > Math.abs(deltaY);
+                }
+
+                if (!isHorizontal) {
+                    return;
+                }
+
+                event.preventDefault();
+                applyOffset(currentOffset + deltaX);
+            }, { passive: false });
+
+            sheet.addEventListener('touchend', () => {
+                if (!isDragging) {
+                    return;
+                }
+                isDragging = false;
+                item.classList.remove('is-swiping');
+                const shouldOpen = dragOffset <= -(SWIPE_ACTION_WIDTH * 0.45);
+                closeSwipeActions(shouldOpen ? item.dataset.id : '');
+            });
+
+            sheet.addEventListener('touchcancel', () => {
+                isDragging = false;
+                item.classList.remove('is-swiping');
+                closeSwipeActions(item.classList.contains('is-open') ? item.dataset.id : '');
+            });
+        });
+    }
+
+    async function completeIdea(ideaId) {
+        const response = await apiRequest(`/ideas/${ideaId}`, 'PUT', { isCompleted: true });
+        if (!response.ok) {
+            throw new Error('标记完成失败');
+        }
+        const updatedIdea = await response.json();
+        ideasCache = ideasCache.map((item) => item.id === ideaId ? { ...item, ...updatedIdea } : item);
+        closeSwipeActions();
+        renderRecent(ideasCache);
+        captureHelp.textContent = '已移入待办收纳。';
+        setSyncMessage('刚刚标记完成', true);
+    }
+
+    async function deleteIdea(ideaId) {
+        const response = await apiRequest(`/ideas/${ideaId}`, 'DELETE');
+        if (!response.ok && response.status !== 404) {
+            throw new Error('删除失败');
+        }
+        ideasCache = ideasCache.filter((item) => item.id !== ideaId);
+        closeSwipeActions();
+        renderRecent(ideasCache);
+        captureHelp.textContent = '已删除这条待办。';
+        setSyncMessage('刚刚删除成功', true);
+    }
+
     function renderQueue() {
         const queue = loadQueue();
         queuedCount.textContent = `${queue.length} 条`;
@@ -124,6 +263,7 @@
     }
 
     function renderRecent(ideas) {
+        ideasCache = Array.isArray(ideas) ? ideas : [];
         const activeIdeas = Array.isArray(ideas)
             ? ideas.filter((item) => !(item.isCompleted || item.is_completed))
             : [];
@@ -145,15 +285,9 @@
         if (!limitedActiveIdeas.length) {
             recentList.innerHTML = '<li class="empty-state">还没有收进来的待办，先写下第一条。</li>';
         } else {
-            recentList.innerHTML = limitedActiveIdeas.map((item) => `
-                <li class="capture-item">
-                    <span class="capture-time">${formatShortTime(item.createdAt || item.created_at || '')}</span>
-                    <div class="capture-body">
-                        <p>${escapeHtml(item.text || '')}</p>
-                        <time>${formatTime(item.createdAt || item.created_at || '')}</time>
-                    </div>
-                </li>
-            `).join('');
+            recentList.innerHTML = limitedActiveIdeas.map(buildSwipeItemMarkup).join('');
+            bindSwipeGestures();
+            closeSwipeActions(openSwipeId);
         }
 
         if (!limitedArchivedIdeas.length) {
@@ -333,6 +467,37 @@
         await fetchRecentIdeas();
         await flushQueue();
     });
+    recentList.addEventListener('click', async (event) => {
+        const actionButton = event.target.closest('[data-action]');
+        if (actionButton) {
+            const ideaId = actionButton.dataset.id;
+            const action = actionButton.dataset.action;
+            actionButton.disabled = true;
+            try {
+                if (action === 'complete') {
+                    await completeIdea(ideaId);
+                } else if (action === 'delete') {
+                    await deleteIdea(ideaId);
+                }
+            } catch (error) {
+                console.error(`[Capture] ${action} idea failed:`, error);
+                captureHelp.textContent = error.message || '操作失败，请稍后重试。';
+                setSyncMessage('操作失败，请重试');
+                actionButton.disabled = false;
+            }
+            return;
+        }
+
+        const swipeItem = event.target.closest('.capture-swipe-item');
+        if (swipeItem && swipeItem.classList.contains('is-open')) {
+            closeSwipeActions();
+            return;
+        }
+
+        if (!event.target.closest('.capture-swipe-item')) {
+            closeSwipeActions();
+        }
+    });
     viewTabs.forEach((tab) => {
         tab.addEventListener('click', () => {
             const nextView = tab.dataset.captureView === 'archive' ? 'archive' : 'active';
@@ -341,8 +506,14 @@
             }
             activeView = nextView;
             saveView(activeView);
+            closeSwipeActions();
             updateViewState();
         });
+    });
+    document.addEventListener('click', (event) => {
+        if (!event.target.closest('.capture-swipe-item')) {
+            closeSwipeActions();
+        }
     });
     window.addEventListener('online', async () => {
         setNetworkState();
