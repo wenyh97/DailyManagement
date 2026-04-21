@@ -1257,6 +1257,21 @@ select.urgency-fallback::-ms-expand { display:none; }
     gap: 18px;
 }
 
+.ideas-mobile-switcher {
+    display: none;
+}
+
+.ideas-mobile-tab {
+    border: none;
+    background: transparent;
+}
+
+.ideas-mobile-tab-label,
+.ideas-mobile-tab-meta,
+.ideas-mobile-tab-count {
+    display: block;
+}
+
 .ideas-section {
     padding: 16px;
     border-radius: 18px;
@@ -2066,6 +2081,131 @@ select.urgency-fallback::-ms-expand { display:none; }
 
 #page-ideas .input-group {
     margin-top: auto;
+}
+
+@media (max-width: 768px) {
+    #page-ideas {
+        min-height: auto;
+    }
+
+    #page-ideas .glass-card {
+        min-height: auto;
+        padding-bottom: 20px;
+    }
+
+    .ideas-board {
+        gap: 14px;
+    }
+
+    .ideas-mobile-switcher {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 10px;
+        padding: 8px;
+        border-radius: 22px;
+        background: linear-gradient(135deg, rgba(226, 232, 240, 0.76) 0%, rgba(241, 245, 249, 0.94) 100%);
+        border: 1px solid rgba(148, 163, 184, 0.18);
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7);
+    }
+
+    .ideas-mobile-tab {
+        position: relative;
+        padding: 14px 14px 12px;
+        border-radius: 18px;
+        text-align: left;
+        color: #475569;
+        cursor: pointer;
+        transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease, color 0.2s ease;
+    }
+
+    .ideas-mobile-tab.active {
+        background: linear-gradient(135deg, #0f172a 0%, #1d4ed8 100%);
+        color: #f8fafc;
+        box-shadow: 0 16px 28px rgba(29, 78, 216, 0.24);
+        transform: translateY(-1px);
+    }
+
+    .ideas-mobile-tab-label {
+        font-size: 0.98em;
+        font-weight: 700;
+        letter-spacing: 0.01em;
+    }
+
+    .ideas-mobile-tab-meta {
+        margin-top: 4px;
+        font-size: 0.74em;
+        opacity: 0.78;
+    }
+
+    .ideas-mobile-tab-count {
+        margin-top: 12px;
+        width: fit-content;
+        min-width: 34px;
+        padding: 5px 10px;
+        border-radius: 999px;
+        font-size: 0.82em;
+        font-weight: 700;
+        background: rgba(255, 255, 255, 0.16);
+        color: inherit;
+    }
+
+    .ideas-mobile-tab:not(.active) .ideas-mobile-tab-count {
+        background: rgba(148, 163, 184, 0.14);
+    }
+
+    .ideas-section {
+        padding: 14px;
+        border-radius: 20px;
+    }
+
+    .ideas-section-header {
+        align-items: flex-start;
+    }
+
+    .ideas-section-header h3 {
+        font-size: 1.05em;
+    }
+
+    .ideas-section-tip {
+        font-size: 0.78em;
+        padding: 5px 9px;
+    }
+
+    .ideas-section-actions {
+        gap: 0;
+    }
+
+    .ideas-section-toggle {
+        display: none;
+    }
+
+    #page-ideas .ideas-container {
+        max-height: none;
+        min-height: 260px;
+        padding: 2px;
+    }
+
+    #page-ideas .input-group {
+        margin-top: 14px;
+        flex-direction: column;
+    }
+
+    #page-ideas .input-group .btn-primary {
+        width: 100%;
+    }
+
+    .idea-item {
+        padding: 12px;
+        margin-bottom: 10px;
+    }
+
+    .idea-actions {
+        align-self: stretch;
+    }
+
+    .idea-actions .btn-convert {
+        padding: 10px 12px;
+    }
 }
 
 /* 日历头部工具栏 */

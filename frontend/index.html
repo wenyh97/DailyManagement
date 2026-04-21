@@ -203,7 +203,19 @@
                         <h2><span class="icon">☑️</span> 待办收集</h2>
                     </div>
                     <div class="ideas-board">
-                        <section class="ideas-section">
+                        <div class="ideas-mobile-switcher" role="tablist" aria-label="待办视图切换">
+                            <button class="ideas-mobile-tab active" type="button" data-ideas-view-tab="collect" role="tab" aria-selected="true">
+                                <span class="ideas-mobile-tab-label">待办收集</span>
+                                <span class="ideas-mobile-tab-meta">当前待处理</span>
+                                <span class="ideas-mobile-tab-count" id="ideas-active-count">0</span>
+                            </button>
+                            <button class="ideas-mobile-tab" type="button" data-ideas-view-tab="archive" role="tab" aria-selected="false">
+                                <span class="ideas-mobile-tab-label">待办收纳</span>
+                                <span class="ideas-mobile-tab-meta">已完成归档</span>
+                                <span class="ideas-mobile-tab-count" id="ideas-archive-count">0</span>
+                            </button>
+                        </div>
+                        <section class="ideas-section ideas-section-collect" data-ideas-view="collect">
                             <div class="ideas-section-header">
                                 <h3>代办收集站</h3>
                                 <span class="ideas-section-tip">当前待处理</span>
@@ -214,7 +226,7 @@
                                 <button id="add-idea" class="btn-primary">+ 添加待办</button>
                             </div>
                         </section>
-                        <section class="ideas-section ideas-section-archive">
+                        <section class="ideas-section ideas-section-archive" data-ideas-view="archive">
                             <div class="ideas-section-header">
                                 <h3>代办收纳站</h3>
                                 <div class="ideas-section-actions">

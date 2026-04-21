@@ -2,9 +2,14 @@ document.addEventListener('DOMContentLoaded', () => { // 监听页面加载完�
     const apiUrl = typeof API_BASE_URL !== 'undefined' ? API_BASE_URL : 'http://127.0.0.1:5000';
     const apiStatusIndicator = document.getElementById('api-status-indicator'); // 获取状态徽章元素
     const ideasPage = document.getElementById('page-ideas');
+    const ideasBoard = ideasPage ? ideasPage.querySelector('.ideas-board') : null;
     const ideasList = document.getElementById('ideas-list'); // 获取待办收集站容器元素
     const ideasArchiveList = document.getElementById('ideas-archive-list'); // 获取待办收纳站容器元素
     const ideasArchiveToggle = document.getElementById('ideas-archive-toggle');
+    const ideasMobileTabs = ideasPage ? Array.from(ideasPage.querySelectorAll('[data-ideas-view-tab]')) : [];
+    const ideasSections = ideasPage ? Array.from(ideasPage.querySelectorAll('[data-ideas-view]')) : [];
+    const ideasActiveCount = document.getElementById('ideas-active-count');
+    const ideasArchiveCount = document.getElementById('ideas-archive-count');
     const newIdeaInput = document.getElementById('new-idea'); // 获取灵感输入框元素
     const addIdeaButton = document.getElementById('add-idea'); // 获取添加灵感按钮元素
     const ideaSortSelect = document.getElementById('idea-sort'); // 灵感排序下拉
@@ -52,7 +57,12 @@ document.addEventListener('DOMContentLoaded', () => { // 监听页面加载完�
     const defaultPlanYear = new Date().getFullYear();
     let selectedPlanningYear = defaultPlanYear;
     const IDEAS_ARCHIVE_COLLAPSED_STORAGE_KEY = 'daily-management.ideasArchiveCollapsed';
+    const IDEAS_MOBILE_VIEW_STORAGE_KEY = 'daily-management.ideasMobileView';
     let ideasArchiveCollapsed = false;
+    let activeIdeasMobileView = 'collect';
+    const ideasMobileMediaQuery = typeof window !== 'undefined' && typeof window.matchMedia === 'function'
+        ? window.matchMedia('(max-width: 768px)')
+        : null;
 
     const normalizeId = (value) => {
         if (value === null || value === undefined) {
@@ -2981,11 +2991,39 @@ document.addEventListener('DOMContentLoaded', () => { // 监听页面加载完�
         if (!ideasArchiveList || !ideasArchiveToggle) {
             return;
         }
-        ideasArchiveList.hidden = ideasArchiveCollapsed;
+        const isMobileViewport = Boolean(ideasMobileMediaQuery && ideasMobileMediaQuery.matches);
+        ideasArchiveList.hidden = isMobileViewport ? activeIdeasMobileView !== 'archive' : ideasArchiveCollapsed;
         ideasArchiveToggle.setAttribute('aria-expanded', String(!ideasArchiveCollapsed));
         ideasArchiveToggle.setAttribute('aria-label', ideasArchiveCollapsed ? '展开代办收纳站' : '收起代办收纳站');
         ideasArchiveToggle.setAttribute('title', ideasArchiveCollapsed ? '展开代办收纳站' : '收起代办收纳站');
         ideasArchiveToggle.classList.toggle('is-collapsed', ideasArchiveCollapsed);
+    };
+
+    const updateIdeasMobileSwitcher = () => {
+        if (!ideasMobileTabs.length) {
+            return;
+        }
+        ideasMobileTabs.forEach((tab) => {
+            const isActive = tab.dataset.ideasViewTab === activeIdeasMobileView;
+            tab.classList.toggle('active', isActive);
+            tab.setAttribute('aria-selected', String(isActive));
+        });
+        if (ideasBoard) {
+            ideasBoard.dataset.activeView = activeIdeasMobileView;
+        }
+    };
+
+    const applyIdeasResponsiveLayout = () => {
+        const isMobileViewport = Boolean(ideasMobileMediaQuery && ideasMobileMediaQuery.matches);
+        ideasSections.forEach((section) => {
+            if (!isMobileViewport) {
+                section.hidden = false;
+                return;
+            }
+            section.hidden = section.dataset.ideasView !== activeIdeasMobileView;
+        });
+        updateIdeasMobileSwitcher();
+        updateIdeasArchiveVisibility();
     };
 
     const loadIdeasArchiveCollapsedState = () => {
@@ -3011,6 +3049,29 @@ document.addEventListener('DOMContentLoaded', () => { // 监听页面加载完�
             localStorage.setItem(IDEAS_ARCHIVE_COLLAPSED_STORAGE_KEY, String(ideasArchiveCollapsed));
         } catch (error) {
             console.warn('[Main] 保存收纳站折叠状态失败:', error);
+        }
+    };
+
+    const loadIdeasMobileViewState = () => {
+        if (typeof localStorage === 'undefined') {
+            return 'collect';
+        }
+        try {
+            const stored = localStorage.getItem(IDEAS_MOBILE_VIEW_STORAGE_KEY);
+            return stored === 'archive' ? 'archive' : 'collect';
+        } catch (error) {
+            return 'collect';
+        }
+    };
+
+    const saveIdeasMobileViewState = () => {
+        if (typeof localStorage === 'undefined') {
+            return;
+        }
+        try {
+            localStorage.setItem(IDEAS_MOBILE_VIEW_STORAGE_KEY, activeIdeasMobileView);
+        } catch (error) {
+            console.warn('[Main] 保存待办移动端视图失败:', error);
         }
     };
 
@@ -3209,7 +3270,14 @@ document.addEventListener('DOMContentLoaded', () => { // 监听页面加载完�
             ? archivedIdeas.map(buildIdeaItemMarkup).join('')
             : buildIdeaEmptyState('✅ 已完成的待办会自动收纳到这里。', 'no-ideas-archive');
 
-        updateIdeasArchiveVisibility();
+        if (ideasActiveCount) {
+            ideasActiveCount.textContent = String(activeIdeas.length);
+        }
+        if (ideasArchiveCount) {
+            ideasArchiveCount.textContent = String(archivedIdeas.length);
+        }
+
+        applyIdeasResponsiveLayout();
         enableIdeaDragAndDrop();
     };
 
@@ -3222,6 +3290,17 @@ document.addEventListener('DOMContentLoaded', () => { // 监听页面加载完�
 
     ideasPage.addEventListener('click', async (event) => {
         const target = event.target; // 获取触发事件的具体元素
+        const mobileViewTab = target.closest('[data-ideas-view-tab]');
+        if (mobileViewTab) {
+            const nextView = mobileViewTab.dataset.ideasViewTab === 'archive' ? 'archive' : 'collect';
+            if (nextView !== activeIdeasMobileView) {
+                activeIdeasMobileView = nextView;
+                saveIdeasMobileViewState();
+                closeIdeaMenus();
+                applyIdeasResponsiveLayout();
+            }
+            return;
+        }
         const menuToggle = target.closest('.idea-menu-toggle');
         if (menuToggle) {
             const ideaId = menuToggle.dataset.id;
@@ -3311,7 +3390,20 @@ document.addEventListener('DOMContentLoaded', () => { // 监听页面加载完�
     });
 
     ideasArchiveCollapsed = loadIdeasArchiveCollapsedState();
-    updateIdeasArchiveVisibility();
+    activeIdeasMobileView = loadIdeasMobileViewState();
+    applyIdeasResponsiveLayout();
+
+    if (ideasMobileMediaQuery) {
+        const handleIdeasViewportChange = () => {
+            closeIdeaMenus();
+            applyIdeasResponsiveLayout();
+        };
+        if (typeof ideasMobileMediaQuery.addEventListener === 'function') {
+            ideasMobileMediaQuery.addEventListener('change', handleIdeasViewportChange);
+        } else if (typeof ideasMobileMediaQuery.addListener === 'function') {
+            ideasMobileMediaQuery.addListener(handleIdeasViewportChange);
+        }
+    }
 
     document.addEventListener('click', (event) => {
         if (!event.target.closest('.idea-menu-shell')) {
