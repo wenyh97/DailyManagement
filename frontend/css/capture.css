@@ -308,6 +308,8 @@ body {
     position: relative;
     overflow: hidden;
     border-radius: 18px;
+    background: rgba(226, 232, 240, 0.82);
+    border: 1px solid rgba(148, 163, 184, 0.14);
 }
 
 .capture-item-actions {
@@ -315,39 +317,114 @@ body {
     top: 0;
     right: 0;
     bottom: 0;
-    width: 148px;
+    width: 184px;
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 8px;
-    padding: 6px;
-    border-radius: 18px;
-    background: linear-gradient(135deg, rgba(226, 232, 240, 0.6) 0%, rgba(203, 213, 225, 0.68) 100%);
+    gap: 0;
+    padding: 0;
+    border-radius: 0 18px 18px 0;
+    overflow: hidden;
+    background: transparent;
 }
 
 .capture-action-button {
     border: none;
-    border-radius: 14px;
+    border-radius: 0;
     color: #fff;
     font: inherit;
     font-size: 13px;
     font-weight: 700;
     cursor: pointer;
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.16);
+    border-left: 1px solid rgba(255, 255, 255, 0.18);
+    box-shadow: none;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    min-height: 100%;
+    padding: 0 10px;
+}
+
+.capture-action-button:first-child {
+    border-left: none;
 }
 
 .capture-action-complete {
-    background: linear-gradient(180deg, #14b8a6 0%, #0f766e 100%);
+    background: #2563eb;
+}
+
+.capture-action-restore {
+    background: #0f766e;
 }
 
 .capture-action-delete {
-    background: linear-gradient(180deg, #fb7185 0%, #e11d48 100%);
+    background: #dc2626;
+}
+
+.capture-action-button:disabled {
+    opacity: 0.72;
+}
+
+.capture-action-complete:hover,
+.capture-action-restore:hover,
+.capture-action-delete:hover {
+    filter: brightness(1.03);
+}
+
+.capture-action-icon {
+    width: 28px;
+    height: 28px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.capture-action-icon svg {
+    width: 20px;
+    height: 20px;
+    display: block;
+}
+
+.capture-action-label {
+    letter-spacing: 0.02em;
+    font-size: 14px;
 }
 
 .capture-item-sheet {
+    position: relative;
+    z-index: 1;
+    width: 100%;
     transform: translateX(var(--swipe-offset));
     transition: transform 0.22s ease, box-shadow 0.22s ease;
     will-change: transform;
     touch-action: pan-y;
+    background: rgba(248, 250, 252, 0.98);
+    border: 1px solid rgba(148, 163, 184, 0.1);
+}
+
+.capture-item-compact {
+    display: block;
+    padding: 14px 16px;
+}
+
+.capture-item-compact::before {
+    display: none;
+}
+
+.capture-item-compact .capture-body p {
+    font-size: 14px;
+    line-height: 1.45;
+}
+
+.capture-item-compact .capture-body time {
+    margin-top: 8px;
+    font-size: 12px;
+    color: #64748b;
+}
+
+.capture-item-sheet.archived {
+    background: rgba(240, 253, 250, 0.96);
 }
 
 .capture-swipe-item.is-open .capture-item-sheet {
@@ -494,13 +571,22 @@ body {
     }
 
     .capture-item-actions {
-        width: 148px;
-        padding: 7px;
+        width: 184px;
+        border-radius: 0 20px 20px 0;
     }
 
     .capture-action-button {
-        border-radius: 16px;
         font-size: 12px;
+        gap: 6px;
+    }
+
+    .capture-action-icon {
+        width: 24px;
+        height: 24px;
+    }
+
+    .capture-action-label {
+        font-size: 13px;
     }
 
     .capture-item::before {
