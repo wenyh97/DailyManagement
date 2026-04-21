@@ -1,4 +1,4 @@
-const CACHE_NAME = 'daily-management-capture-v1';
+const CACHE_NAME = 'daily-management-capture-v2';
 const APP_SHELL = [
     './capture.html',
     './css/capture.css',
@@ -45,16 +45,12 @@ self.addEventListener('fetch', (event) => {
     }
 
     event.respondWith(
-        caches.match(request).then((cachedResponse) => {
-            const networkFetch = fetch(request)
-                .then((networkResponse) => {
-                    const cloned = networkResponse.clone();
-                    caches.open(CACHE_NAME).then((cache) => cache.put(request, cloned));
-                    return networkResponse;
-                })
-                .catch(() => cachedResponse);
-
-            return cachedResponse || networkFetch;
-        })
+        fetch(request)
+            .then((networkResponse) => {
+                const cloned = networkResponse.clone();
+                caches.open(CACHE_NAME).then((cache) => cache.put(request, cloned));
+                return networkResponse;
+            })
+            .catch(() => caches.match(request))
     );
 });

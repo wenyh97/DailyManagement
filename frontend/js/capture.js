@@ -1,6 +1,7 @@
 (function () {
     const DRAFT_STORAGE_KEY = 'dailyManagement.capture.draft';
     const QUEUE_STORAGE_KEY = 'dailyManagement.capture.queue';
+    const VIEW_STORAGE_KEY = 'dailyManagement.capture.view';
     const MAX_RECENT_ITEMS = 12;
 
     const form = document.getElementById('capture-form');
@@ -10,12 +11,20 @@
     const logoutButton = document.getElementById('logout-button');
     const refreshButton = document.getElementById('refresh-button');
     const recentList = document.getElementById('recent-list');
+    const archiveList = document.getElementById('archive-list');
     const queuedList = document.getElementById('queued-list');
     const queuedPanel = document.getElementById('queued-panel');
     const queuedCount = document.getElementById('queued-count');
+    const recentCount = document.getElementById('recent-count');
+    const archiveCount = document.getElementById('archive-count');
+    const activeViewCount = document.getElementById('active-view-count');
+    const archiveViewCount = document.getElementById('archive-view-count');
+    const viewTabs = Array.from(document.querySelectorAll('[data-capture-view]'));
+    const viewPanels = Array.from(document.querySelectorAll('[data-capture-panel]'));
     const networkStatus = document.getElementById('network-status');
     const syncStatus = document.getElementById('sync-status');
     const captureHelp = document.getElementById('capture-help');
+    let activeView = loadView();
 
     function saveDraft(value) {
         localStorage.setItem(DRAFT_STORAGE_KEY, value);
@@ -44,6 +53,15 @@
         localStorage.setItem(QUEUE_STORAGE_KEY, JSON.stringify(queue));
     }
 
+    function loadView() {
+        const stored = localStorage.getItem(VIEW_STORAGE_KEY);
+        return stored === 'archive' ? 'archive' : 'active';
+    }
+
+    function saveView(view) {
+        localStorage.setItem(VIEW_STORAGE_KEY, view === 'archive' ? 'archive' : 'active');
+    }
+
     function formatTime(value) {
         try {
             return new Date(value).toLocaleString('zh-CN', {
@@ -68,6 +86,11 @@
         }
     }
 
+    function parseTime(value) {
+        const time = new Date(value || '').getTime();
+        return Number.isFinite(time) ? time : 0;
+    }
+
     function renderQueue() {
         const queue = loadQueue();
         queuedCount.textContent = `${queue.length} 条`;
@@ -89,25 +112,65 @@
         `).join('');
     }
 
+    function updateViewState() {
+        viewTabs.forEach((tab) => {
+            const isActive = tab.dataset.captureView === activeView;
+            tab.classList.toggle('active', isActive);
+            tab.setAttribute('aria-selected', String(isActive));
+        });
+        viewPanels.forEach((panel) => {
+            panel.hidden = panel.dataset.capturePanel !== activeView;
+        });
+    }
+
     function renderRecent(ideas) {
         const activeIdeas = Array.isArray(ideas)
             ? ideas.filter((item) => !(item.isCompleted || item.is_completed))
             : [];
+        const archivedIdeas = Array.isArray(ideas)
+            ? ideas.filter((item) => item.isCompleted || item.is_completed)
+            : [];
 
-        if (!activeIdeas.length) {
+        activeIdeas.sort((left, right) => parseTime(right.createdAt || right.created_at) - parseTime(left.createdAt || left.created_at));
+        archivedIdeas.sort((left, right) => parseTime(right.completedAt || right.completed_at || right.createdAt || right.created_at) - parseTime(left.completedAt || left.completed_at || left.createdAt || left.created_at));
+
+        const limitedActiveIdeas = activeIdeas.slice(0, MAX_RECENT_ITEMS);
+        const limitedArchivedIdeas = archivedIdeas.slice(0, MAX_RECENT_ITEMS);
+
+        recentCount.textContent = `${activeIdeas.length} 条`;
+        archiveCount.textContent = `${archivedIdeas.length} 条`;
+        activeViewCount.textContent = String(activeIdeas.length);
+        archiveViewCount.textContent = String(archivedIdeas.length);
+
+        if (!limitedActiveIdeas.length) {
             recentList.innerHTML = '<li class="empty-state">还没有收进来的待办，先写下第一条。</li>';
-            return;
+        } else {
+            recentList.innerHTML = limitedActiveIdeas.map((item) => `
+                <li class="capture-item">
+                    <span class="capture-time">${formatShortTime(item.createdAt || item.created_at || '')}</span>
+                    <div class="capture-body">
+                        <p>${escapeHtml(item.text || '')}</p>
+                        <time>${formatTime(item.createdAt || item.created_at || '')}</time>
+                    </div>
+                </li>
+            `).join('');
         }
 
-        recentList.innerHTML = activeIdeas.slice(0, MAX_RECENT_ITEMS).map((item) => `
-            <li class="capture-item">
-                <span class="capture-time">${formatShortTime(item.createdAt || item.created_at || '')}</span>
-                <div class="capture-body">
-                    <p>${escapeHtml(item.text || '')}</p>
-                    <time>${formatTime(item.createdAt || item.created_at || '')}</time>
-                </div>
-            </li>
-        `).join('');
+        if (!limitedArchivedIdeas.length) {
+            archiveList.innerHTML = '<li class="empty-state">还没有已收纳的待办，完成后会自动归档到这里。</li>';
+        } else {
+            archiveList.innerHTML = limitedArchivedIdeas.map((item) => `
+                <li class="capture-item archived">
+                    <span class="capture-time">${formatShortTime(item.completedAt || item.completed_at || item.createdAt || item.created_at || '')}</span>
+                    <div class="capture-body">
+                        <p>${escapeHtml(item.text || '')}</p>
+                        <time>完成于 ${formatTime(item.completedAt || item.completed_at || item.createdAt || item.created_at || '')}</time>
+                    </div>
+                </li>
+            `).join('');
+        }
+
+        updateViewState();
     }
 
     function escapeHtml(value) {
@@ -270,6 +333,17 @@
         await fetchRecentIdeas();
         await flushQueue();
     });
+    viewTabs.forEach((tab) => {
+        tab.addEventListener('click', () => {
+            const nextView = tab.dataset.captureView === 'archive' ? 'archive' : 'active';
+            if (nextView === activeView) {
+                return;
+            }
+            activeView = nextView;
+            saveView(activeView);
+            updateViewState();
+        });
+    });
     window.addEventListener('online', async () => {
         setNetworkState();
         await flushQueue();
@@ -278,6 +352,7 @@
 
     input.value = loadDraft();
     renderQueue();
+    updateViewState();
     setNetworkState();
     setSyncMessage(loadQueue().length ? '有待同步记录' : '准备就绪', !loadQueue().length);
 

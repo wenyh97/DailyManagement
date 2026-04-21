@@ -162,6 +162,81 @@ body {
     padding-top: 14px;
 }
 
+.capture-browser-panel {
+    padding-top: 16px;
+}
+
+.capture-browser-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.capture-view-switcher {
+    flex: 1;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+    padding: 6px;
+    border-radius: 18px;
+    background: rgba(226, 232, 240, 0.64);
+    border: 1px solid rgba(148, 163, 184, 0.16);
+}
+
+.capture-view-tab {
+    border: none;
+    border-radius: 14px;
+    background: transparent;
+    color: var(--muted);
+    min-height: 52px;
+    padding: 10px 12px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    font: inherit;
+    cursor: pointer;
+    transition: background 0.2s ease, color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+}
+
+.capture-view-tab.active {
+    background: linear-gradient(135deg, var(--accent) 0%, #14b8a6 100%);
+    color: #fff;
+    box-shadow: 0 12px 24px rgba(15, 118, 110, 0.18);
+}
+
+.capture-view-label {
+    font-weight: 700;
+    font-size: 13px;
+}
+
+.capture-view-count {
+    min-width: 28px;
+    height: 28px;
+    padding: 0 8px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.2);
+    font-size: 12px;
+    font-weight: 700;
+}
+
+.capture-view-tab:not(.active) .capture-view-count {
+    background: rgba(255, 255, 255, 0.72);
+    color: var(--accent-strong);
+}
+
+.capture-refresh-button {
+    flex-shrink: 0;
+}
+
+.capture-panel-list {
+    margin-top: 12px;
+}
+
 .capture-footer {
     margin-top: 20px;
     padding-top: 14px;
@@ -303,6 +378,16 @@ body {
     color: #a16207;
 }
 
+.capture-item.archived {
+    background: rgba(240, 253, 250, 0.82);
+    border-color: rgba(45, 212, 191, 0.18);
+}
+
+.capture-item.archived .capture-time {
+    background: rgba(204, 251, 241, 0.92);
+    color: var(--accent-strong);
+}
+
 @media (max-width: 520px) {
     .capture-shell {
         padding: 10px 10px 20px;
@@ -319,6 +404,20 @@ body {
 
     .capture-header h1 {
         font-size: 24px;
+    }
+
+    .capture-browser-toolbar {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .capture-view-switcher {
+        width: 100%;
+    }
+
+    .capture-view-tab {
+        min-height: 48px;
+        padding: 10px;
     }
 
     .capture-actions {
@@ -349,7 +448,8 @@ body {
 
     .primary-button,
     .secondary-button,
-    .ghost-button {
+    .ghost-button,
+    .capture-refresh-button {
         width: 100%;
     }
 }

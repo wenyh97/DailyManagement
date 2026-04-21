@@ -51,13 +51,39 @@
                 <ul class="capture-list" id="queued-list"></ul>
             </section>
 
-            <section class="capture-panel">
+            <section class="capture-panel capture-browser-panel">
+                <div class="capture-browser-toolbar">
+                    <div class="capture-view-switcher" role="tablist" aria-label="待办视图切换">
+                        <button type="button" class="capture-view-tab active" id="active-view-tab" data-capture-view="active" role="tab" aria-selected="true">
+                            <span class="capture-view-label">待处理</span>
+                            <span class="capture-view-count" id="active-view-count">0</span>
+                        </button>
+                        <button type="button" class="capture-view-tab" id="archive-view-tab" data-capture-view="archive" role="tab" aria-selected="false">
+                            <span class="capture-view-label">待办收纳</span>
+                            <span class="capture-view-count" id="archive-view-count">0</span>
+                        </button>
+                    </div>
+                    <button type="button" class="link-button capture-refresh-button" id="refresh-button">刷新</button>
+                </div>
+            </section>
+
+            <section class="capture-panel capture-panel-list" data-capture-panel="active">
                 <div class="panel-header">
                     <h2>刚刚记下</h2>
-                    <button type="button" class="link-button" id="refresh-button">刷新</button>
+                    <span id="recent-count">0 条</span>
                 </div>
                 <ul class="capture-list" id="recent-list">
                     <li class="empty-state">正在加载刚刚记下的待办...</li>
+                </ul>
+            </section>
+
+            <section class="capture-panel capture-panel-list" data-capture-panel="archive" hidden>
+                <div class="panel-header">
+                    <h2>待办收纳</h2>
+                    <span id="archive-count">0 条</span>
+                </div>
+                <ul class="capture-list" id="archive-list">
+                    <li class="empty-state">正在加载已收纳的待办...</li>
                 </ul>
             </section>
 
