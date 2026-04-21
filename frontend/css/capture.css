@@ -308,8 +308,8 @@ body {
     position: relative;
     overflow: hidden;
     border-radius: 18px;
-    background: rgba(226, 232, 240, 0.82);
-    border: 1px solid rgba(148, 163, 184, 0.14);
+    background: #e2e8f0;
+    border: 1px solid #d7e0ea;
 }
 
 .capture-item-actions {
@@ -399,8 +399,8 @@ body {
     transition: transform 0.22s ease, box-shadow 0.22s ease;
     will-change: transform;
     touch-action: pan-y;
-    background: rgba(248, 250, 252, 0.98);
-    border: 1px solid rgba(148, 163, 184, 0.1);
+    background: #f8fafc;
+    border: 1px solid #dbe4ee;
 }
 
 .capture-item-compact {
@@ -424,7 +424,7 @@ body {
 }
 
 .capture-item-sheet.archived {
-    background: rgba(240, 253, 250, 0.96);
+    background: #f0fdf4;
 }
 
 .capture-swipe-item.is-open .capture-item-sheet {
