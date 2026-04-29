@@ -24,10 +24,58 @@
     const networkStatus = document.getElementById('network-status');
     const syncStatus = document.getElementById('sync-status');
     const captureHelp = document.getElementById('capture-help');
+    const detailBackdrop = document.getElementById('capture-detail-backdrop');
+    const detailText = document.getElementById('capture-detail-text');
+    const detailTime = document.getElementById('capture-detail-time');
+    const detailCloseButton = document.getElementById('capture-detail-close');
 
     let activeView = loadView();
     let ideasCache = [];
     let openSwipeKey = '';
+    let longPressTimer = null;
+    let longPressItemId = '';
+
+    function clearLongPressTimer() {
+        if (longPressTimer) {
+            window.clearTimeout(longPressTimer);
+            longPressTimer = null;
+        }
+    }
+
+    function hideDetailDialog() {
+        clearLongPressTimer();
+        longPressItemId = '';
+        detailBackdrop.classList.add('hidden');
+        detailBackdrop.setAttribute('aria-hidden', 'true');
+        detailText.textContent = '';
+        detailTime.textContent = '';
+    }
+
+    function showDetailDialog(item, listType) {
+        if (!item) {
+            return;
+        }
+
+        const timeLabel = listType === 'archive'
+            ? `完成于 ${formatTime(item.completedAt || item.completed_at || item.createdAt || item.created_at || '')}`
+            : `记录于 ${formatTime(item.createdAt || item.created_at || '')}`;
+
+        detailText.textContent = item.text || '';
+        detailTime.textContent = timeLabel;
+        detailBackdrop.classList.remove('hidden');
+        detailBackdrop.setAttribute('aria-hidden', 'false');
+    }
+
+    function startLongPress(item, listType) {
+        clearLongPressTimer();
+        longPressItemId = String(item?.id || '');
+        longPressTimer = window.setTimeout(() => {
+            if (longPressItemId === String(item?.id || '')) {
+                closeSwipeActions();
+                showDetailDialog(item, listType);
+            }
+        }, 450);
+    }
 
     function saveDraft(value) {
         localStorage.setItem(DRAFT_STORAGE_KEY, value);
@@ -176,7 +224,7 @@
             : formatTime(item.createdAt || item.created_at || '');
 
         return `
-            <li class="capture-swipe-item" data-id="${itemId}" data-swipe-key="${swipeKey}" style="--swipe-offset: 0px;">
+            <li class="capture-swipe-item" data-id="${itemId}" data-list-type="${escapeHtml(listType)}" data-swipe-key="${swipeKey}" style="--swipe-offset: 0px;">
                 <div class="capture-item-actions" aria-hidden="true">
                     ${actionMarkup}
                 </div>
@@ -207,6 +255,7 @@
             let dragOffset = 0;
             let isDragging = false;
             let isHorizontal = false;
+            let longPressTriggered = false;
 
             const applyOffset = (offset) => {
                 const limitedOffset = Math.max(-SWIPE_ACTION_WIDTH, Math.min(0, offset));
@@ -222,6 +271,19 @@
                 dragOffset = currentOffset;
                 isDragging = true;
                 isHorizontal = false;
+                longPressTriggered = false;
+                const itemData = ideasCache.find((entry) => String(entry.id) === String(item.dataset.id));
+                clearLongPressTimer();
+                longPressItemId = String(itemData?.id || '');
+                longPressTimer = window.setTimeout(() => {
+                    if (longPressItemId === String(itemData?.id || '')) {
+                        longPressTriggered = true;
+                        isDragging = false;
+                        item.classList.remove('is-swiping');
+                        closeSwipeActions();
+                        showDetailDialog(itemData, item.dataset.listType || 'active');
+                    }
+                }, 450);
                 if (!item.classList.contains('is-open')) {
                     closeSwipeActions();
                 }
@@ -236,9 +298,14 @@
                 const deltaX = touch.clientX - startX;
                 const deltaY = touch.clientY - startY;
 
+                if (Math.abs(deltaX) > 8 || Math.abs(deltaY) > 8) {
+                    clearLongPressTimer();
+                }
+
                 if (!isHorizontal) {
                     if (Math.abs(deltaY) > 10 && Math.abs(deltaY) > Math.abs(deltaX)) {
                         isDragging = false;
+                        clearLongPressTimer();
                         item.classList.remove('is-swiping');
                         item.style.setProperty('--swipe-offset', `${currentOffset}px`);
                         return;
@@ -258,6 +325,12 @@
             }, { passive: false });
 
             sheet.addEventListener('touchend', () => {
+                clearLongPressTimer();
+                if (longPressTriggered) {
+                    isDragging = false;
+                    item.classList.remove('is-swiping');
+                    return;
+                }
                 if (!isDragging) {
                     return;
                 }
@@ -268,10 +341,29 @@
             });
 
             sheet.addEventListener('touchcancel', () => {
+                clearLongPressTimer();
                 isDragging = false;
                 item.classList.remove('is-swiping');
                 closeSwipeActions(item.classList.contains('is-open') ? item.dataset.swipeKey : '');
             });
+
+            sheet.addEventListener('contextmenu', (event) => {
+                event.preventDefault();
+                const itemData = ideasCache.find((entry) => String(entry.id) === String(item.dataset.id));
+                closeSwipeActions();
+                showDetailDialog(itemData, item.dataset.listType || 'active');
+            });
+
+            sheet.addEventListener('pointerdown', (event) => {
+                if (event.pointerType !== 'mouse') {
+                    return;
+                }
+                const itemData = ideasCache.find((entry) => String(entry.id) === String(item.dataset.id));
+                startLongPress(itemData, item.dataset.listType || 'active');
+            });
+
+            sheet.addEventListener('pointerup', clearLongPressTimer);
+            sheet.addEventListener('pointerleave', clearLongPressTimer);
         });
     }
 
@@ -576,6 +668,17 @@
     document.addEventListener('click', (event) => {
         if (!event.target.closest('.capture-swipe-item')) {
             closeSwipeActions();
+        }
+    });
+    detailCloseButton.addEventListener('click', hideDetailDialog);
+    detailBackdrop.addEventListener('click', (event) => {
+        if (event.target === detailBackdrop) {
+            hideDetailDialog();
+        }
+    });
+    document.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape' && !detailBackdrop.classList.contains('hidden')) {
+            hideDetailDialog();
         }
     });
     window.addEventListener('online', async () => {

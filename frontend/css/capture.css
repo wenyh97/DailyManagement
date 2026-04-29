@@ -78,8 +78,8 @@ body {
 
 .capture-form {
     display: grid;
-    gap: 10px;
-    margin-top: 14px;
+    gap: 8px;
+    margin-top: 12px;
 }
 
 .capture-label {
@@ -170,17 +170,20 @@ body {
     color: var(--muted);
     font-size: 12px;
     line-height: 1.5;
-    min-height: 18px;
+}
+
+.capture-help:empty {
+    display: none;
 }
 
 .capture-panel {
-    margin-top: 18px;
+    margin-top: 12px;
     border-top: 1px solid rgba(148, 163, 184, 0.18);
-    padding-top: 14px;
+    padding-top: 10px;
 }
 
 .capture-browser-panel {
-    padding-top: 16px;
+    padding-top: 12px;
 }
 
 .capture-browser-toolbar {
@@ -251,7 +254,7 @@ body {
 }
 
 .capture-panel-list {
-    margin-top: 12px;
+    margin-top: 8px;
 }
 
 .capture-footer {
@@ -325,7 +328,7 @@ body {
     position: relative;
     overflow: hidden;
     border-radius: 18px;
-    background: #e2e8f0;
+    background: #dde6ef;
     border: 1px solid #d7e0ea;
 }
 
@@ -341,7 +344,7 @@ body {
     padding: 0;
     border-radius: 0 18px 18px 0;
     overflow: hidden;
-    background: transparent;
+    background: #d9e2ec;
 }
 
 .capture-action-button {
@@ -421,8 +424,11 @@ body {
 }
 
 .capture-item-compact {
-    display: block;
-    padding: 14px 16px;
+    display: flex;
+    align-items: center;
+    min-height: 74px;
+    height: 74px;
+    padding: 10px 14px;
 }
 
 .capture-item-compact::before {
@@ -431,11 +437,14 @@ body {
 
 .capture-item-compact .capture-body p {
     font-size: 14px;
-    line-height: 1.45;
+    line-height: 1.35;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .capture-item-compact .capture-body time {
-    margin-top: 8px;
+    margin-top: 4px;
     font-size: 12px;
     color: #64748b;
 }
@@ -455,7 +464,7 @@ body {
 .capture-item,
 .empty-state {
     border-radius: 16px;
-    background: rgba(248, 250, 252, 0.9);
+    background: #f8fafc;
     border: 1px solid rgba(148, 163, 184, 0.14);
     padding: 12px 14px;
 }
@@ -495,6 +504,7 @@ body {
 
 .capture-body {
     min-width: 0;
+    width: 100%;
 }
 
 .capture-item p,
@@ -518,7 +528,7 @@ body {
 }
 
 .capture-item.pending {
-    background: rgba(254, 249, 195, 0.58);
+    background: #fef3c7;
     border-color: rgba(234, 179, 8, 0.2);
 }
 
@@ -528,7 +538,7 @@ body {
 }
 
 .capture-item.archived {
-    background: rgba(240, 253, 250, 0.82);
+    background: #ecfdf5;
     border-color: rgba(45, 212, 191, 0.18);
 }
 
@@ -537,14 +547,72 @@ body {
     color: var(--accent-strong);
 }
 
+.capture-detail-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 40;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    background: rgba(15, 23, 42, 0.38);
+    backdrop-filter: blur(8px);
+}
+
+.capture-detail-dialog {
+    width: min(100%, 360px);
+    padding: 20px;
+    border-radius: 22px;
+    background: #ffffff;
+    box-shadow: 0 24px 48px rgba(15, 23, 42, 0.22);
+}
+
+.capture-detail-kicker {
+    margin: 0 0 6px;
+    color: var(--accent);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.capture-detail-dialog h2 {
+    margin: 0;
+    font-size: 22px;
+}
+
+.capture-detail-text {
+    margin: 14px 0 0;
+    font-size: 15px;
+    line-height: 1.7;
+    color: var(--text);
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
+.capture-detail-time {
+    margin: 10px 0 0;
+    font-size: 12px;
+    color: var(--muted);
+}
+
+.capture-detail-button {
+    width: 100%;
+    margin-top: 18px;
+}
+
+.hidden {
+    display: none !important;
+}
+
 @media (max-width: 520px) {
     .capture-shell {
-        padding: 10px 10px 20px;
+        padding: 8px 8px 16px;
     }
 
     .capture-card {
         border-radius: 20px;
-        padding: 14px;
+        padding: 12px;
     }
 
     .capture-header h1 {
@@ -567,7 +635,7 @@ body {
 
     .capture-item {
         grid-template-columns: 1fr;
-        gap: 8px;
+        gap: 6px;
     }
 
     .capture-swipe-item {
@@ -599,6 +667,12 @@ body {
 
     .capture-time {
         justify-self: start;
+    }
+
+    .capture-item-compact {
+        min-height: 70px;
+        height: 70px;
+        padding: 10px 12px;
     }
 
     #recent-list {
