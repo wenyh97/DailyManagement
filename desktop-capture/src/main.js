@@ -60,6 +60,7 @@ const elements = {
   editorInput: document.getElementById('editor-input'),
   editorCancelButton: document.getElementById('editor-cancel-button'),
   editorSaveButton: document.getElementById('editor-save-button'),
+  ideaPreviewTooltip: document.getElementById('idea-preview-tooltip'),
 };
 
 const state = {
@@ -72,6 +73,8 @@ const state = {
   syncIntervalId: null,
   isSyncing: false,
   editingIdeaId: null,
+  hoverPreviewTimerId: null,
+  hoverPreviewTarget: null,
 };
 
 function normalizeApiBase(value) {
@@ -367,6 +370,79 @@ function renderEmptyState(message) {
   elements.recentList.innerHTML = `<li class="empty-state">${escapeHtml(message)}</li>`;
 }
 
+function clearHoverPreviewTimer() {
+  if (state.hoverPreviewTimerId) {
+    window.clearTimeout(state.hoverPreviewTimerId);
+    state.hoverPreviewTimerId = null;
+  }
+}
+
+function hideIdeaPreview() {
+  clearHoverPreviewTimer();
+  state.hoverPreviewTarget = null;
+  elements.ideaPreviewTooltip.classList.add('hidden');
+  elements.ideaPreviewTooltip.setAttribute('aria-hidden', 'true');
+  elements.ideaPreviewTooltip.textContent = '';
+}
+
+function showIdeaPreview(target) {
+  if (!target) {
+    return;
+  }
+
+  const text = target.dataset.fullText || target.textContent || '';
+  if (!text.trim()) {
+    return;
+  }
+
+  const rect = target.getBoundingClientRect();
+  const tooltip = elements.ideaPreviewTooltip;
+  const viewportPadding = 12;
+
+  tooltip.textContent = text;
+  tooltip.classList.remove('hidden');
+  tooltip.setAttribute('aria-hidden', 'false');
+
+  const tooltipRect = tooltip.getBoundingClientRect();
+  let top = rect.bottom + 10;
+  let left = rect.left;
+
+  if (left + tooltipRect.width > window.innerWidth - viewportPadding) {
+    left = window.innerWidth - tooltipRect.width - viewportPadding;
+  }
+  if (left < viewportPadding) {
+    left = viewportPadding;
+  }
+
+  if (top + tooltipRect.height > window.innerHeight - viewportPadding) {
+    top = rect.top - tooltipRect.height - 10;
+  }
+  if (top < viewportPadding) {
+    top = viewportPadding;
+  }
+
+  tooltip.style.left = `${left}px`;
+  tooltip.style.top = `${top}px`;
+}
+
+function scheduleIdeaPreview(target) {
+  if (!target) {
+    return;
+  }
+
+  if (state.hoverPreviewTarget === target) {
+    return;
+  }
+
+  hideIdeaPreview();
+  state.hoverPreviewTarget = target;
+  state.hoverPreviewTimerId = window.setTimeout(() => {
+    if (state.hoverPreviewTarget === target) {
+      showIdeaPreview(target);
+    }
+  }, 1500);
+}
+
 function buildIdeaActionsMarkup(idea) {
   const ideaId = escapeHtml(idea.id);
   return `
@@ -445,7 +521,7 @@ function buildPendingIdeaMarkup(idea) {
         <span class="item-check-mark"></span>
       </label>
       <div class="item-body">
-        <p>${escapeHtml(idea.text || '')}</p>
+        <p data-full-text="${escapeHtml(idea.text || '')}">${escapeHtml(idea.text || '')}</p>
         <time>${escapeHtml(formatTime(createdAt))}</time>
       </div>
       ${buildIdeaActionsMarkup(idea)}
@@ -462,7 +538,7 @@ function buildArchivedIdeaMarkup(idea) {
         <span class="item-check-mark"></span>
       </label>
       <div class="item-body">
-        <p>${escapeHtml(idea.text || '')}</p>
+        <p data-full-text="${escapeHtml(idea.text || '')}">${escapeHtml(idea.text || '')}</p>
         <time>完成于 ${escapeHtml(formatTime(completedAt))}</time>
       </div>
       ${buildIdeaActionsMarkup(idea)}
@@ -500,6 +576,8 @@ function getArchivedEvents() {
 }
 
 function renderDashboard() {
+  hideIdeaPreview();
+  closeIdeaActionMenus();
   renderViewButtons();
   renderSyncButton();
 
@@ -855,6 +933,7 @@ elements.recentList.addEventListener('click', async (event) => {
 
   if (action === 'toggle-menu') {
     event.stopPropagation();
+    hideIdeaPreview();
     toggleIdeaActionMenu(ideaId);
     return;
   }
@@ -862,6 +941,7 @@ elements.recentList.addEventListener('click', async (event) => {
   if (action === 'edit-idea') {
     event.stopPropagation();
     closeIdeaActionMenus();
+    hideIdeaPreview();
     openIdeaEditor(ideaId);
     return;
   }
@@ -869,6 +949,7 @@ elements.recentList.addEventListener('click', async (event) => {
   if (action === 'delete-idea') {
     event.stopPropagation();
     closeIdeaActionMenus();
+    hideIdeaPreview();
     const confirmed = await showDialog({
       title: '删除待办',
       message: '删除后不能恢复，确认删除这条待办吗？',
@@ -891,6 +972,29 @@ elements.recentList.addEventListener('click', async (event) => {
       actionButton.disabled = false;
     }
   }
+});
+
+elements.recentList.addEventListener('mouseover', (event) => {
+  const textNode = event.target.closest('.history-item[data-kind="idea"] .item-body p');
+  if (!textNode || !elements.recentList.contains(textNode)) {
+    return;
+  }
+
+  scheduleIdeaPreview(textNode);
+});
+
+elements.recentList.addEventListener('mouseout', (event) => {
+  const textNode = event.target.closest('.history-item[data-kind="idea"] .item-body p');
+  if (!textNode || !elements.recentList.contains(textNode)) {
+    return;
+  }
+
+  const nextTarget = event.relatedTarget;
+  if (nextTarget && textNode.contains(nextTarget)) {
+    return;
+  }
+
+  hideIdeaPreview();
 });
 
 elements.viewActiveButton.addEventListener('click', () => {
@@ -1003,6 +1107,15 @@ document.addEventListener('click', (event) => {
   if (!event.target.closest('.settings-shell')) {
     setSettingsMenuOpen(false);
   }
+});
+
+elements.recentList.addEventListener('scroll', () => {
+  hideIdeaPreview();
+});
+
+window.addEventListener('blur', () => {
+  hideIdeaPreview();
+  closeIdeaActionMenus();
 });
 
 document.addEventListener('keydown', (event) => {
