@@ -1,6 +1,6 @@
 [package]
 name = "tonybase_capture"
-version = "0.1.9"
+version = "0.1.10"
 description = "TonyBase desktop capture"
 authors = ["GitHub Copilot"]
 edition = "2021"

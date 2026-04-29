@@ -357,7 +357,7 @@ textarea {
 .history-item,
 .empty-state {
     border-radius: 12px;
-    padding: 9px 10px;
+    padding: 8px 10px;
     background: var(--panel-strong);
     border: 1px solid var(--panel-border);
 }
@@ -368,7 +368,7 @@ textarea {
     grid-template-columns: auto minmax(0, 1fr) auto;
     align-items: center;
     gap: 8px;
-    min-height: 46px;
+    height: 56px;
     overflow: visible;
 }
 
@@ -385,7 +385,6 @@ textarea {
     position: relative;
     width: 18px;
     height: 18px;
-    margin-top: 2px;
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -432,7 +431,7 @@ textarea {
 
 .item-body p {
     font-size: 12px;
-    line-height: 1.2;
+    line-height: 1.1;
     color: var(--text-main);
     white-space: nowrap;
     overflow: hidden;
@@ -471,8 +470,8 @@ textarea {
 }
 
 .item-menu-button {
-    width: 28px;
-    height: 28px;
+    width: 26px;
+    height: 26px;
     padding: 0;
     display: inline-flex;
     align-items: center;
@@ -492,8 +491,8 @@ textarea {
 }
 
 .item-menu-button svg {
-    width: 14px;
-    height: 14px;
+    width: 13px;
+    height: 13px;
 }
 
 .item-actions-menu {
