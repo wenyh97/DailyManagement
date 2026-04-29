@@ -112,6 +112,23 @@
                 </div>
             </section>
         </div>
+
+        <div class="dialog-backdrop hidden" id="editor-backdrop" aria-hidden="true">
+            <section class="dialog-card" role="dialog" aria-modal="true" aria-labelledby="editor-title">
+                <p class="section-label">待办编辑</p>
+                <h2 id="editor-title">修改待办</h2>
+                <form id="editor-form" class="form-stack">
+                    <label class="field">
+                        <span>待办内容</span>
+                        <textarea id="editor-input" rows="4" required></textarea>
+                    </label>
+                    <div class="dialog-actions">
+                        <button class="secondary-button" id="editor-cancel-button" type="button">取消</button>
+                        <button class="primary-button" id="editor-save-button" type="submit">保存</button>
+                    </div>
+                </form>
+            </section>
+        </div>
     </div>
 
     <script type="module" src="./main.js"></script>

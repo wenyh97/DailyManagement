@@ -1,7 +1,7 @@
 name: Build Desktop Capture
 
 env:
-  SERVER_HOST: 20.24.210.200
+  SERVER_HOST: dailymanagement.tonybase.site
   SERVER_USER: TonyAdmin
   SERVER_BASE_PATH: /home/TonyAdmin
   DOWNLOAD_BASE_URL: https://dailymanagement.tonybase.site/downloads/desktop

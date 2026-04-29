@@ -16,6 +16,11 @@ const VIEW_MODES = {
   archive: 'archive',
 };
 const SYNC_INTERVAL_MS = 30000;
+const SETTINGS_ICON_MARKUP = `
+  <svg viewBox="0 0 24 24" aria-hidden="true">
+    <path d="M10.9 2.9a1 1 0 0 1 2.2 0l.36 1.63a7.68 7.68 0 0 1 1.57.65l1.45-.83a1 1 0 0 1 1.5.87v1.67c.47.37.9.79 1.28 1.26l1.66.01a1 1 0 0 1 .87 1.5l-.84 1.45c.28.5.5 1.03.66 1.58l1.62.35a1 1 0 0 1 0 2.22l-1.62.35a7.6 7.6 0 0 1-.66 1.58l.84 1.45a1 1 0 0 1-.87 1.5l-1.66.02c-.38.46-.81.88-1.28 1.25v1.67a1 1 0 0 1-1.5.87l-1.45-.83a7.68 7.68 0 0 1-1.57.65l-.36 1.63a1 1 0 0 1-2.2 0l-.36-1.63a7.68 7.68 0 0 1-1.57-.65l-1.45.83a1 1 0 0 1-1.5-.87v-1.67a7.93 7.93 0 0 1-1.28-1.25l-1.66-.01a1 1 0 0 1-.87-1.5l.84-1.45a7.6 7.6 0 0 1-.66-1.58l-1.62-.35a1 1 0 0 1 0-2.22l1.62-.35c.16-.55.38-1.08.66-1.58l-.84-1.45a1 1 0 0 1 .87-1.5l1.66-.01c.38-.47.81-.89 1.28-1.26V5.21a1 1 0 0 1 1.5-.87l1.45.83c.5-.28 1.03-.5 1.57-.65zM12 9.2A2.8 2.8 0 1 0 12 14.8 2.8 2.8 0 0 0 12 9.2z" fill="currentColor"/>
+  </svg>
+`;
 
 const elements = {
   loginPanel: document.getElementById('login-panel'),
@@ -49,6 +54,12 @@ const elements = {
   dialogMessage: document.getElementById('dialog-message'),
   dialogCancelButton: document.getElementById('dialog-cancel-button'),
   dialogConfirmButton: document.getElementById('dialog-confirm-button'),
+  editorBackdrop: document.getElementById('editor-backdrop'),
+  editorForm: document.getElementById('editor-form'),
+  editorTitle: document.getElementById('editor-title'),
+  editorInput: document.getElementById('editor-input'),
+  editorCancelButton: document.getElementById('editor-cancel-button'),
+  editorSaveButton: document.getElementById('editor-save-button'),
 };
 
 const state = {
@@ -60,6 +71,7 @@ const state = {
   events: [],
   syncIntervalId: null,
   isSyncing: false,
+  editingIdeaId: null,
 };
 
 function normalizeApiBase(value) {
@@ -355,6 +367,75 @@ function renderEmptyState(message) {
   elements.recentList.innerHTML = `<li class="empty-state">${escapeHtml(message)}</li>`;
 }
 
+function buildIdeaActionsMarkup(idea) {
+  const ideaId = escapeHtml(idea.id);
+  return `
+    <div class="item-menu-shell">
+      <button class="item-menu-button" type="button" aria-label="待办设置" aria-expanded="false" data-action="toggle-menu" data-id="${ideaId}">
+        ${SETTINGS_ICON_MARKUP}
+      </button>
+      <div class="item-actions-menu hidden" data-role="idea-actions" data-id="${ideaId}">
+        <button class="item-action-button" type="button" data-action="edit-idea" data-id="${ideaId}">修改</button>
+        <button class="item-action-button danger" type="button" data-action="delete-idea" data-id="${ideaId}">删除</button>
+      </div>
+    </div>
+  `;
+}
+
+function closeIdeaActionMenus() {
+  document.querySelectorAll('.item-actions-menu').forEach((menu) => {
+    menu.classList.add('hidden');
+  });
+
+  document.querySelectorAll('.item-menu-button[aria-expanded="true"]').forEach((button) => {
+    button.setAttribute('aria-expanded', 'false');
+  });
+}
+
+function toggleIdeaActionMenu(ideaId) {
+  const trigger = elements.recentList.querySelector(`.item-menu-button[data-id="${CSS.escape(ideaId)}"]`);
+  const menu = elements.recentList.querySelector(`.item-actions-menu[data-id="${CSS.escape(ideaId)}"]`);
+
+  if (!trigger || !menu) {
+    return;
+  }
+
+  const willOpen = menu.classList.contains('hidden');
+  closeIdeaActionMenus();
+  if (!willOpen) {
+    return;
+  }
+
+  menu.classList.remove('hidden');
+  trigger.setAttribute('aria-expanded', 'true');
+}
+
+function openIdeaEditor(ideaId) {
+  const idea = state.ideas.find((item) => item.id === ideaId);
+  if (!idea) {
+    setAppStatus('待办不存在', true);
+    return;
+  }
+
+  state.editingIdeaId = ideaId;
+  elements.editorTitle.textContent = '修改待办';
+  elements.editorInput.value = idea.text || '';
+  elements.editorBackdrop.classList.remove('hidden');
+  elements.editorBackdrop.setAttribute('aria-hidden', 'false');
+  window.setTimeout(() => {
+    elements.editorInput.focus();
+    elements.editorInput.select();
+  }, 0);
+}
+
+function closeIdeaEditor() {
+  state.editingIdeaId = null;
+  elements.editorBackdrop.classList.add('hidden');
+  elements.editorBackdrop.setAttribute('aria-hidden', 'true');
+  elements.editorForm.reset();
+  elements.editorSaveButton.disabled = false;
+}
+
 function buildPendingIdeaMarkup(idea) {
   const createdAt = idea.createdAt || idea.created_at || '';
   return `
@@ -367,7 +448,7 @@ function buildPendingIdeaMarkup(idea) {
         <p>${escapeHtml(idea.text || '')}</p>
         <time>${escapeHtml(formatTime(createdAt))}</time>
       </div>
-      <span class="item-meta todo">待办</span>
+      ${buildIdeaActionsMarkup(idea)}
     </li>
   `;
 }
@@ -384,7 +465,7 @@ function buildArchivedIdeaMarkup(idea) {
         <p>${escapeHtml(idea.text || '')}</p>
         <time>完成于 ${escapeHtml(formatTime(completedAt))}</time>
       </div>
-      <span class="item-meta todo">待办</span>
+      ${buildIdeaActionsMarkup(idea)}
     </li>
   `;
 }
@@ -596,14 +677,33 @@ async function submitIdea(text) {
   return response.json();
 }
 
-async function updateIdeaCompletion(ideaId, nextCompleted) {
+async function updateIdea(ideaId, payload) {
   const response = await apiRequest(`/ideas/${ideaId}`, {
     method: 'PUT',
-    body: JSON.stringify({ isCompleted: nextCompleted }),
+    body: JSON.stringify(payload),
   });
 
   if (!response.ok) {
-    let message = '更新待办状态失败';
+    let message = '更新待办失败';
+    try {
+      const payload = await response.json();
+      message = payload.error || message;
+    } catch {
+      // Keep fallback message.
+    }
+    throw new Error(message);
+  }
+
+  return response.json();
+}
+
+async function deleteIdea(ideaId) {
+  const response = await apiRequest(`/ideas/${ideaId}`, {
+    method: 'DELETE',
+  });
+
+  if (!response.ok) {
+    let message = '删除待办失败';
     try {
       const payload = await response.json();
       message = payload.error || message;
@@ -731,7 +831,7 @@ elements.recentList.addEventListener('change', async (event) => {
   checkbox.disabled = true;
 
   try {
-    await updateIdeaCompletion(ideaId, nextCompleted);
+    await updateIdea(ideaId, { isCompleted: nextCompleted });
     setAppStatus(nextCompleted ? '已完成待办' : '已恢复待办');
     await syncDashboard(false);
   } catch (error) {
@@ -739,6 +839,57 @@ elements.recentList.addEventListener('change', async (event) => {
     setAppStatus(error.message || '更新待办状态失败', true);
   } finally {
     checkbox.disabled = false;
+  }
+});
+
+elements.recentList.addEventListener('click', async (event) => {
+  const actionButton = event.target.closest('[data-action]');
+  if (!actionButton) {
+    return;
+  }
+
+  const { action, id: ideaId } = actionButton.dataset;
+  if (!action || !ideaId) {
+    return;
+  }
+
+  if (action === 'toggle-menu') {
+    event.stopPropagation();
+    toggleIdeaActionMenu(ideaId);
+    return;
+  }
+
+  if (action === 'edit-idea') {
+    event.stopPropagation();
+    closeIdeaActionMenus();
+    openIdeaEditor(ideaId);
+    return;
+  }
+
+  if (action === 'delete-idea') {
+    event.stopPropagation();
+    closeIdeaActionMenus();
+    const confirmed = await showDialog({
+      title: '删除待办',
+      message: '删除后不能恢复，确认删除这条待办吗？',
+      confirmText: '删除',
+      cancelText: '取消',
+    });
+
+    if (!confirmed) {
+      return;
+    }
+
+    actionButton.disabled = true;
+    try {
+      await deleteIdea(ideaId);
+      setAppStatus('已删除待办');
+      await syncDashboard(false);
+    } catch (error) {
+      setAppStatus(error.message || '删除待办失败', true);
+    } finally {
+      actionButton.disabled = false;
+    }
   }
 });
 
@@ -806,7 +957,49 @@ elements.dialogBackdrop.addEventListener('click', (event) => {
   }
 });
 
+elements.editorCancelButton.addEventListener('click', () => {
+  closeIdeaEditor();
+});
+
+elements.editorBackdrop.addEventListener('click', (event) => {
+  if (event.target === elements.editorBackdrop) {
+    closeIdeaEditor();
+  }
+});
+
+elements.editorForm.addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const ideaId = state.editingIdeaId;
+  const text = elements.editorInput.value.trim();
+
+  if (!ideaId) {
+    closeIdeaEditor();
+    return;
+  }
+
+  if (!text) {
+    setAppStatus('待办内容不能为空', true);
+    elements.editorInput.focus();
+    return;
+  }
+
+  elements.editorSaveButton.disabled = true;
+  try {
+    await updateIdea(ideaId, { text });
+    closeIdeaEditor();
+    setAppStatus('已更新待办');
+    await syncDashboard(false);
+  } catch (error) {
+    elements.editorSaveButton.disabled = false;
+    setAppStatus(error.message || '更新待办失败', true);
+  }
+});
+
 document.addEventListener('click', (event) => {
+  if (!event.target.closest('.item-menu-shell')) {
+    closeIdeaActionMenus();
+  }
+
   if (!event.target.closest('.settings-shell')) {
     setSettingsMenuOpen(false);
   }
@@ -819,7 +1012,13 @@ document.addEventListener('keydown', (event) => {
       return;
     }
 
+    if (!elements.editorBackdrop.classList.contains('hidden')) {
+      closeIdeaEditor();
+      return;
+    }
+
     setSettingsMenuOpen(false);
+    closeIdeaActionMenus();
   }
 });
 
@@ -828,14 +1027,6 @@ elements.ideaInput.addEventListener('keydown', (event) => {
     event.preventDefault();
     elements.captureForm.requestSubmit();
   }
-});
-
-document.documentElement.addEventListener('mouseenter', () => {
-  void invoke('handle_window_hover', { hovering: true }).catch(() => {});
-});
-
-document.documentElement.addEventListener('mouseleave', () => {
-  void invoke('handle_window_hover', { hovering: false }).catch(() => {});
 });
 
 renderDashboard();
