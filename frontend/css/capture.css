@@ -50,6 +50,10 @@ body {
     align-items: flex-start;
 }
 
+.capture-heading {
+    min-width: 0;
+}
+
 .capture-kicker {
     margin: 0 0 6px;
     color: var(--accent);
@@ -93,7 +97,7 @@ body {
     max-height: 148px;
     font: inherit;
     color: inherit;
-    background: rgba(255, 255, 255, 0.9);
+    background: #ffffff;
     box-shadow: inset 0 1px 1px rgba(15, 23, 42, 0.04);
 }
 
@@ -109,7 +113,6 @@ body {
 }
 
 .primary-button,
-.secondary-button,
 .ghost-button,
 .link-button {
     border: 0;
@@ -118,7 +121,6 @@ body {
 }
 
 .primary-button,
-.secondary-button,
 .ghost-button {
     min-height: 46px;
     padding: 0 18px;
@@ -131,15 +133,29 @@ body {
     color: #fff;
 }
 
-.secondary-button {
-    background: rgba(148, 163, 184, 0.14);
-    color: var(--muted);
-}
-
 .ghost-button {
     background: transparent;
     color: var(--muted);
     border: 1px solid rgba(148, 163, 184, 0.25);
+}
+
+.icon-button {
+    width: 44px;
+    height: 44px;
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid rgba(148, 163, 184, 0.2);
+    border-radius: 14px;
+    background: rgba(255, 255, 255, 0.96);
+    color: var(--accent);
+    box-shadow: 0 10px 22px rgba(15, 23, 42, 0.08);
+}
+
+.icon-button svg {
+    width: 19px;
+    height: 19px;
 }
 
 .link-button {
@@ -154,6 +170,7 @@ body {
     color: var(--muted);
     font-size: 12px;
     line-height: 1.5;
+    min-height: 18px;
 }
 
 .capture-panel {
@@ -169,7 +186,7 @@ body {
 .capture-browser-toolbar {
     display: flex;
     align-items: center;
-    justify-content: space-between;
+    justify-content: stretch;
     gap: 12px;
 }
 
@@ -230,7 +247,7 @@ body {
 }
 
 .capture-refresh-button {
-    flex-shrink: 0;
+    margin-left: auto;
 }
 
 .capture-panel-list {
@@ -530,17 +547,8 @@ body {
         padding: 14px;
     }
 
-    .capture-header {
-        flex-direction: column;
-    }
-
     .capture-header h1 {
         font-size: 24px;
-    }
-
-    .capture-browser-toolbar {
-        flex-direction: column;
-        align-items: stretch;
     }
 
     .capture-view-switcher {
@@ -550,10 +558,6 @@ body {
     .capture-view-tab {
         min-height: 48px;
         padding: 10px;
-    }
-
-    .capture-actions {
-        flex-direction: column-reverse;
     }
 
     .capture-footer {
@@ -602,9 +606,7 @@ body {
     }
 
     .primary-button,
-    .secondary-button,
-    .ghost-button,
-    .capture-refresh-button {
+    .ghost-button {
         width: 100%;
     }
 }

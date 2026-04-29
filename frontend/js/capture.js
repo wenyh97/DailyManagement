@@ -8,7 +8,6 @@
     const form = document.getElementById('capture-form');
     const input = document.getElementById('capture-input');
     const submitButton = document.getElementById('submit-button');
-    const clearDraftButton = document.getElementById('clear-draft-button');
     const logoutButton = document.getElementById('logout-button');
     const refreshButton = document.getElementById('refresh-button');
     const recentList = document.getElementById('recent-list');
@@ -555,12 +554,6 @@
 
     form.addEventListener('submit', handleSubmit);
     input.addEventListener('input', () => saveDraft(input.value));
-    clearDraftButton.addEventListener('click', () => {
-        input.value = '';
-        clearDraft();
-        captureHelp.textContent = '草稿已清空。';
-        input.focus();
-    });
     logoutButton.addEventListener('click', logout);
     refreshButton.addEventListener('click', async () => {
         await fetchRecentIdeas();
