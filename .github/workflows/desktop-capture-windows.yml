@@ -49,7 +49,13 @@ jobs:
 
       - name: Prepare release assets
         run: |
-          $version = (Get-Content package.json | ConvertFrom-Json).version
+          $packageVersion = (Get-Content package.json | ConvertFrom-Json).version
+          $tauriVersion = (Get-Content src-tauri/tauri.conf.json | ConvertFrom-Json).version
+          if ($packageVersion -ne $tauriVersion) {
+            throw "版本不一致: package.json=$packageVersion, tauri.conf.json=$tauriVersion"
+          }
+
+          $version = $tauriVersion
           $releaseDir = "release-assets"
           New-Item -ItemType Directory -Force -Path $releaseDir | Out-Null
 
